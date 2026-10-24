@@ -48,6 +48,24 @@ export default function RegisterPage() {
         nickname,
         status: 'DALAM ANTREAN',
       });
+
+      // Simpan & pancarkan ke dashboard admin secara real-time
+      try {
+        const newItem = {
+          id: `reg-${Date.now()}`,
+          number: formattedNum,
+          nickname,
+          status: 'QUEUED',
+          registeredAt: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+          printCopies: 1,
+        };
+        const existing = JSON.parse(localStorage.getItem('photobooth_registered_tickets') || '[]');
+        localStorage.setItem('photobooth_registered_tickets', JSON.stringify([newItem, ...existing]));
+
+        const ch = new BroadcastChannel('photobooth_session_sync');
+        ch.postMessage({ type: 'NEW_REGISTRATION', item: newItem });
+        ch.close();
+      } catch {}
     } catch {
       setError('Terjadi kesalahan saat mendaftar. Silakan coba lagi.');
     } finally {

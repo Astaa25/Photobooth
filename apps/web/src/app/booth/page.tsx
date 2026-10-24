@@ -84,6 +84,7 @@ export default function BoothKioskPage() {
 
   // Status alur booth: standby (tunggu admin) atau tahap foto
   const [step, setStep] = useState<BoothStep>('standby');
+  const [templates, setTemplates] = useState<TemplateOption[]>(TEMPLATES);
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateOption>(TEMPLATES[0]);
   const [visitorName, setVisitorName] = useState('');
   const [ticketNumber, setTicketNumber] = useState('');
@@ -102,9 +103,25 @@ export default function BoothKioskPage() {
     }
   }, []);
 
-  // Sinkronisasi Sesi Aktif dengan Admin Dashboard secara Real-Time
+  // Sinkronisasi Sesi Aktif & Desain Bingkai dengan Admin Dashboard secara Real-Time
   useEffect(() => {
     if (typeof window === 'undefined') return;
+
+    // Muat template kustom dari admin jika ada
+    const loadTemplates = () => {
+      try {
+        const raw = localStorage.getItem('photobooth_custom_templates');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setTemplates([...TEMPLATES, ...parsed]);
+            return;
+          }
+        }
+      } catch {}
+      setTemplates(TEMPLATES);
+    };
+    loadTemplates();
 
     // 1. Periksa sesi aktif awal di localStorage
     const checkActiveSession = () => {
@@ -142,6 +159,8 @@ export default function BoothKioskPage() {
           setVisitorName('');
           setTicketNumber('');
           setCapturedPhotos([]);
+        } else if (event.data?.type === 'TEMPLATES_UPDATED') {
+          loadTemplates();
         }
       };
     } catch {}
@@ -595,7 +614,7 @@ export default function BoothKioskPage() {
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-6">
-              {TEMPLATES.map((tpl) => (
+              {templates.map((tpl) => (
                 <button
                   key={tpl.slug}
                   onClick={() => {
