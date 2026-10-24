@@ -260,7 +260,7 @@ export default function GalleryPage() {
 
         {/* Floating Toast Notifikasi Unduh (Tidak Merusak / Menggeser Grid Galeri) */}
         {singleDownloadSuccess && (
-          <div className="fixed bottom-8 right-8 z-50 max-w-sm px-4 py-3 pixel-box bg-[#0C1230]/95 border-2 border-[#00E599] text-white text-xs font-pixel-title flex items-center gap-3 shadow-[0_0_20px_rgba(0,229,153,0.4)] animate-fadeIn">
+          <div className="fixed bottom-6 right-6 z-50 inline-flex items-center gap-3 bg-[#0C1230] border-2 border-[#00E599] text-white text-xs font-pixel-title px-4 py-2.5 max-w-sm w-auto h-auto shadow-[0_4px_25px_rgba(0,0,0,0.85),0_0_15px_rgba(0,229,153,0.4)] animate-fadeIn">
             <CheckCircle className="w-4 h-4 text-[#00E599] shrink-0" />
             <span className="leading-snug">Berhasil mengunduh <span className="text-[#00E599]">{singleDownloadSuccess}</span>!</span>
           </div>

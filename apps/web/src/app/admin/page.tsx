@@ -585,7 +585,8 @@ export default function AdminDashboardPage() {
   );
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#050C38] text-white font-pixel select-none">
+    <>
+      <div className="flex h-screen w-screen overflow-hidden bg-[#050C38] text-white font-pixel select-none">
       {/* Background Layer: Langit Malam & Bintang Pixel */}
       <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#160078] via-[#050C38] to-[#010030] pointer-events-none" />
       <div className="fixed inset-0 bg-[url('/assets/pixel/stars-a.png')] bg-repeat pixel-art opacity-40 animate-twinkle pointer-events-none" />
@@ -1644,26 +1645,27 @@ export default function AdminDashboardPage() {
           <span>POLITEKNIK NEGERI LHOKSEUMAWE &bull; TIK 2026</span>
         </footer>
       </div>
-
-      {/* =====================================================================
-          3. NOTIFIKASI TOAST FLOATING (POJOK KANAN BAWAH, TIDAK MENUTUPI HEADER / SIDEBAR)
-          ===================================================================== */}
-      {toastMessage && (
-        <div className="fixed bottom-14 right-6 z-50 max-w-sm px-4 py-3 pixel-box bg-[#0C1230] border-2 border-[#5CE1E6] text-white text-xs font-pixel-title flex items-center gap-3 shadow-[0_0_25px_rgba(5,12,56,0.95)] animate-fadeIn">
-          <Sparkles className="w-4 h-4 text-[#FFD84D] shrink-0" />
-          <span className="flex-1 text-[11px] leading-snug text-white font-normal">{toastMessage}</span>
-          <button
-            onClick={() => {
-              if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-              setToastMessage(null);
-            }}
-            className="p-1 text-white/50 hover:text-white shrink-0"
-            title="Tutup Notifikasi"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
     </div>
+
+    {/* =====================================================================
+        3. NOTIFIKASI TOAST FLOATING (INDEPENDEN DI LUAR FLEXBOX CONTAINER)
+        ===================================================================== */}
+    {toastMessage && (
+      <div className="fixed bottom-6 right-6 z-50 inline-flex items-center gap-3 bg-[#0C1230] border-2 border-[#5CE1E6] text-white text-xs font-pixel-title px-4 py-2.5 max-w-sm w-auto h-auto shadow-[0_4px_25px_rgba(0,0,0,0.85),0_0_15px_rgba(92,225,230,0.5)] animate-fadeIn select-none pointer-events-auto">
+        <Sparkles className="w-4 h-4 text-[#FFD84D] shrink-0" />
+        <span className="text-[11px] leading-snug text-white font-normal whitespace-normal">{toastMessage}</span>
+        <button
+          onClick={() => {
+            if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+            setToastMessage(null);
+          }}
+          className="p-1 text-white/50 hover:text-white shrink-0 ml-auto"
+          title="Tutup Notifikasi"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    )}
+  </>
   );
 }
