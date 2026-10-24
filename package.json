@@ -11,7 +11,10 @@
     "lint:fix": "biome check --write .",
     "typecheck": "pnpm -r run typecheck",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "db:generate": "pnpm --filter @photobooth/server db:generate",
+    "db:push": "pnpm --filter @photobooth/server db:push",
+    "db:migrate": "pnpm --filter @photobooth/server db:migrate"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
