@@ -174,3 +174,30 @@ body {
   animation: twinkleStar 4s ease-in-out infinite;
 }
 
+/* CRT Scanline Overlay */
+.pixel-crt {
+  position: relative;
+}
+.pixel-crt::after {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0; left: 0; bottom: 0; right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.3) 50%);
+  background-size: 100% 4px;
+  z-index: 5;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+/* Badge Arcade 8-bit */
+.pixel-badge {
+  font-family: var(--font-pixel-display), ui-monospace, monospace;
+  box-shadow: 
+    0 -2px 0 0 currentColor,
+    0 2px 0 0 currentColor,
+    -2px 0 0 0 currentColor,
+    2px 0 0 0 currentColor;
+  border-radius: 0;
+}
+

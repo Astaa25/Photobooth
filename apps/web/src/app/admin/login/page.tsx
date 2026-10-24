@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Shield, Lock, User, ArrowLeft, AlertCircle } from 'lucide-react';
+import { PixelCrossStar, PixelStreetLamp, PixelVendingMachine } from '@/components/pixel/PixelPosterDecorations';
+import { retroAudio } from '@/utils/audio';
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -18,16 +20,13 @@ export default function AdminLoginPage() {
     setLoading(true);
 
     try {
-      // Autentikasi operator/admin (default: operator / operator123 atau admin / admin123)
       if (
         (username === 'admin' && password === 'admin123') ||
         (username === 'operator' && password === 'operator123')
       ) {
-        // Set cookie sesi untuk Next.js middleware (berlaku 8 jam)
+        retroAudio.playSuccessChime();
         const maxAge = 8 * 60 * 60;
         document.cookie = `booth_admin_session=${username}; path=/; max-age=${maxAge}; SameSite=Lax`;
-
-        // Redirect ke dashboard admin
         router.push('/admin');
         router.refresh();
       } else {
@@ -41,36 +40,51 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-paper flex flex-col justify-center items-center px-6 py-12 relative overflow-hidden">
-      {/* Background Glow Aksen Gradien Cyber */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-96 h-96 bg-gradient-cyber opacity-15 blur-3xl pointer-events-none rounded-full" />
+    <div className="min-h-screen bg-[#050C38] text-white font-pixel flex flex-col justify-center items-center px-6 py-12 relative overflow-hidden select-none">
+      {/* Background Layer: Gradien Langit Malam & Bintang Pixel */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#160078] via-[#050C38] to-[#010030] pointer-events-none" />
+      <div className="absolute inset-0 bg-[url('/assets/pixel/stars-a.png')] bg-repeat pixel-art opacity-50 animate-twinkle pointer-events-none" />
+      <div className="absolute bottom-0 left-0 right-0 h-44 bg-[url('/assets/pixel/city-night.png')] bg-repeat-x bg-bottom pixel-art opacity-35 pointer-events-none" />
+
+      {/* Dekorasi Pixel di Sudut Kiri dan Kanan */}
+      <div className="absolute bottom-0 left-12 z-0 hidden md:block pointer-events-none">
+        <PixelStreetLamp height={120} />
+      </div>
+      <div className="absolute bottom-0 right-12 z-0 hidden md:block pointer-events-none">
+        <PixelVendingMachine height={110} />
+      </div>
 
       <div className="w-full max-w-sm relative z-10">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 text-xs font-medium text-ink-soft hover:text-ink mb-6 transition-colors"
+          className="inline-flex items-center gap-2 text-xs font-pixel-title text-[#A9B8FF] hover:text-[#FFD84D] mb-6 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Kembali ke Halaman Utama</span>
+          <span>&lt;&lt; KEMBALI KE BERANDA</span>
         </Link>
 
-        <div className="bg-paper-raised border border-sheet rounded-panel p-8 shadow-raise-2">
+        <div className="bg-[#0C1230]/95 pixel-box p-8 backdrop-blur">
           {/* Header */}
-          <div className="text-center mb-8">
-            <div className="w-12 h-12 rounded-btn bg-gradient-night text-white flex items-center justify-center mx-auto mb-3 shadow-violet-glow">
-              <Shield className="w-6 h-6 text-white" />
+          <div className="text-center mb-6">
+            <div className="w-14 h-14 pixel-box-cyber bg-[#E02F75] text-white flex items-center justify-center mx-auto mb-3 shadow-[0_0_12px_#E02F75]">
+              <Shield className="w-7 h-7 text-white" />
             </div>
-            <h1 className="font-display text-2xl font-bold text-ink">
-              Masuk Operator
-            </h1>
-            <p className="text-xs text-ink-soft mt-1">
-              Photobooth Terintegrasi &bull; Panel Kendali Laptop
+
+            <div className="flex items-center justify-center gap-1.5 text-[#FFD84D] mb-1">
+              <PixelCrossStar size={10} />
+              <h1 className="font-pixel-title text-sm tracking-wider">
+                OPERATOR TERMINAL
+              </h1>
+              <PixelCrossStar size={10} />
+            </div>
+            <p className="text-xs text-[#A9B8FF]">
+              EXPO WISUDA TIK 2026 &bull; Panel Laptop
             </p>
           </div>
 
           {error && (
-            <div className="p-3 mb-6 rounded-btn bg-red-50 border border-signal-bad/20 text-signal-bad text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
+            <div className="p-3 mb-5 border-2 border-[#FE0168] bg-[#FE0168]/20 text-[#FF8E72] text-xs font-pixel-title flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-[#FE0168]" />
               <span>{error}</span>
             </div>
           )}
@@ -78,8 +92,8 @@ export default function AdminLoginPage() {
           {/* Form Login */}
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-ink mb-1.5">
-                Pengguna
+              <label className="block text-[11px] font-pixel-title text-[#FFD84D] mb-1.5">
+                NAMA PENGGUNA
               </label>
               <div className="relative">
                 <input
@@ -87,16 +101,16 @@ export default function AdminLoginPage() {
                   required
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="admin atau operator"
-                  className="w-full h-11 pl-10 pr-4 rounded-btn border border-sheet bg-paper text-ink text-sm focus:outline-none focus:ring-2 focus:ring-ultramarine transition-all"
+                  placeholder="operator / admin"
+                  className="w-full h-11 pl-10 pr-3 border-2 border-[#4B57B2] bg-[#050C38] text-white font-pixel text-xs focus:outline-none focus:border-[#E02F75] transition-all"
                 />
-                <User className="w-4 h-4 text-film absolute left-3.5 top-3.5 pointer-events-none" />
+                <User className="w-4 h-4 text-[#A9B8FF]/60 absolute left-3 top-3.5 pointer-events-none" />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-ink mb-1.5">
-                Kata Sandi
+              <label className="block text-[11px] font-pixel-title text-[#FFD84D] mb-1.5">
+                KATA SANDI
               </label>
               <div className="relative">
                 <input
@@ -105,24 +119,24 @@ export default function AdminLoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full h-11 pl-10 pr-4 rounded-btn border border-sheet bg-paper text-ink text-sm focus:outline-none focus:ring-2 focus:ring-ultramarine transition-all"
+                  className="w-full h-11 pl-10 pr-3 border-2 border-[#4B57B2] bg-[#050C38] text-white font-pixel text-xs focus:outline-none focus:border-[#E02F75] transition-all"
                 />
-                <Lock className="w-4 h-4 text-film absolute left-3.5 top-3.5 pointer-events-none" />
+                <Lock className="w-4 h-4 text-[#A9B8FF]/60 absolute left-3 top-3.5 pointer-events-none" />
               </div>
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-11 rounded-btn bg-gradient-night text-white font-medium text-sm transition-all btn-press shadow-raise-1 flex items-center justify-center gap-2 mt-2 hover:opacity-95 disabled:opacity-50"
+              className="w-full h-12 pixel-btn bg-[#049A5C] hover:bg-[#00E599] text-white font-pixel-title text-xs tracking-wider transition-all flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
             >
-              {loading ? 'Memeriksa kredensial...' : 'Masuk Dashboard'}
+              {loading ? 'MEMERIKSA...' : 'MASUK KE DASHBOARD'}
             </button>
           </form>
 
-          <div className="mt-6 pt-4 border-t border-sheet text-center">
-            <span className="text-[11px] text-film">
-              Akses terbatas untuk kru dan operator photobooth acara.
+          <div className="mt-6 pt-4 border-t-2 border-[#4B57B2]/40 text-center">
+            <span className="text-[10px] text-white/50 block">
+              Default: operator / operator123
             </span>
           </div>
         </div>
