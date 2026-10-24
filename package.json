@@ -14,7 +14,8 @@
     "test:watch": "vitest",
     "db:generate": "pnpm --filter @photobooth/server db:generate",
     "db:push": "pnpm --filter @photobooth/server db:push",
-    "db:migrate": "pnpm --filter @photobooth/server db:migrate"
+    "db:migrate": "pnpm --filter @photobooth/server db:migrate",
+    "db:seed": "tsx scripts/seed.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
