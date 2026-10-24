@@ -51,6 +51,8 @@ module.exports = {
       fontFamily: {
         display: ['var(--font-display)', 'system-ui', 'sans-serif'],
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
+        'pixel-display': ['var(--font-pixel-display)', 'ui-monospace', 'monospace'],
+        'pixel-body': ['var(--font-pixel-body)', 'ui-monospace', 'monospace'],
       },
       boxShadow: {
         'raise-1': '0 1px 2px rgb(18 21 26 / 0.06), 0 1px 1px rgb(18 21 26 / 0.04)',

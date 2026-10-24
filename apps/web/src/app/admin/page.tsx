@@ -14,6 +14,7 @@ import {
   AlertCircle,
   Eye,
   LogOut,
+  Camera,
 } from 'lucide-react';
 import { QueueStatus, type QueueStatusType } from '@photobooth/shared';
 
@@ -109,6 +110,16 @@ export default function AdminDashboardPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          <a
+            href="/booth"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn bg-gradient-night text-white text-xs font-medium hover:opacity-95 transition-all shadow-violet-glow"
+            title="Buka Layar Kios Booth untuk Tablet"
+          >
+            <Camera className="w-3.5 h-3.5" />
+            <span>Layar Booth (Tablet)</span>
+          </a>
           <span className="inline-flex items-center gap-2 px-3 py-1 rounded-chip bg-emerald-50 text-signal-ok text-xs font-medium">
             <span className="w-2 h-2 rounded-full bg-signal-ok" />
             Booth #1 Online

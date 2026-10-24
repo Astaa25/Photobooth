@@ -1,0 +1,22 @@
+{
+  "name": "Photobooth TIK — Kiosk Booth App",
+  "short_name": "Booth App",
+  "description": "Aplikasi Photobooth Kios Layar Penuh Expo Wisuda Jurusan TIK 2026",
+  "start_url": "/booth",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#010030",
+  "theme_color": "#050C38",
+  "icons": [
+    {
+      "src": "/assets/pixel/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/assets/pixel/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

@@ -80,3 +80,97 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* =========================================================
+   TEMA PIXEL ART METROPOLITAN (EXPO WISUDA TIK 2026)
+   ========================================================= */
+
+.font-pixel-title {
+  font-family: var(--font-pixel-display), ui-monospace, monospace;
+  text-shadow: 2px 2px 0 #050C38, 4px 4px 0 #010030;
+  letter-spacing: 1px;
+}
+
+.font-pixel {
+  font-family: var(--font-pixel-body), ui-monospace, monospace;
+}
+
+.pixel-art {
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+}
+
+/* Kotak Pixel Bertakik (4px Notched Border) */
+.pixel-box {
+  position: relative;
+  box-shadow: 
+    0 -4px 0 0 #4B57B2,
+    0 4px 0 0 #4B57B2,
+    -4px 0 0 0 #4B57B2,
+    4px 0 0 0 #4B57B2,
+    6px 6px 0 0 rgba(5, 12, 56, 0.7);
+}
+
+.pixel-box-cyber {
+  position: relative;
+  box-shadow: 
+    0 -4px 0 0 #E02F75,
+    0 4px 0 0 #E02F75,
+    -4px 0 0 0 #E02F75,
+    4px 0 0 0 #E02F75,
+    6px 6px 0 0 rgba(103, 0, 163, 0.6);
+}
+
+/* Tombol Arcade Retro 8-bit / 16-bit */
+.pixel-btn {
+  font-family: var(--font-pixel-display), ui-monospace, monospace;
+  position: relative;
+  text-transform: uppercase;
+  border-radius: 0;
+  box-shadow: 
+    inset -4px -4px 0 0 rgba(0, 0, 0, 0.4),
+    inset 4px 4px 0 0 rgba(255, 255, 255, 0.35),
+    0 -4px 0 0 #000, 0 4px 0 0 #000, -4px 0 0 0 #000, 4px 0 0 0 #000,
+    4px 6px 0 0 rgba(0, 0, 0, 0.5);
+  transition: transform 90ms steps(2, end);
+}
+
+.pixel-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 
+    inset -2px -2px 0 0 rgba(0, 0, 0, 0.4),
+    inset 2px 2px 0 0 rgba(255, 255, 255, 0.35),
+    0 -4px 0 0 #000, 0 4px 0 0 #000, -4px 0 0 0 #000, 4px 0 0 0 #000,
+    2px 2px 0 0 rgba(0, 0, 0, 0.5);
+}
+
+/* Animasi Awan Mengambang Perlahan */
+@keyframes cloudDriftSlow {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(120vw); }
+}
+
+@keyframes cloudDriftFast {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(110vw); }
+}
+
+.animate-cloud-slow {
+  animation: cloudDriftSlow 45s linear infinite;
+}
+
+.animate-cloud-fast {
+  animation: cloudDriftFast 30s linear infinite;
+}
+
+/* Animasi Kerlap-Kerlip Bintang */
+@keyframes twinkleStar {
+  0%, 100% { opacity: 0.35; transform: scale(0.98); }
+  50% { opacity: 0.85; transform: scale(1.02); }
+}
+
+.animate-twinkle {
+  animation: twinkleStar 4s ease-in-out infinite;
+}
+
