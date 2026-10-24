@@ -124,9 +124,9 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full h-12 rounded-btn bg-ultramarine hover:bg-ultramarine-press text-white font-medium text-sm transition-all btn-press shadow-raise-1 flex items-center justify-center gap-2 mt-4 disabled:opacity-50"
+              className="w-full h-12 rounded-btn bg-gradient-cyber hover:opacity-95 text-white font-medium text-sm transition-all btn-press shadow-cyber-glow flex items-center justify-center gap-2 mt-4 disabled:opacity-50"
             >
-              {isSubmitting ? 'Memproses antrean...' : 'Daftar antrean'}
+              {isSubmitting ? 'Memproses antrean...' : 'Daftar Antrean Sekarang'}
             </button>
           </form>
 
@@ -136,23 +136,25 @@ export default function RegisterPage() {
         </div>
       ) : (
         /* Status Tiket Berhasil */
-        <div className="p-8 bg-paper-raised border border-sheet rounded-panel shadow-raise-2 text-center animate-fadeIn">
-          <div className="w-12 h-12 mx-auto rounded-full bg-green-50 text-signal-ok flex items-center justify-center mb-4">
+        <div className="p-8 bg-paper-raised border border-sheet rounded-panel shadow-raise-2 text-center animate-fadeIn relative overflow-hidden">
+          <div className="absolute -top-12 -right-12 w-32 h-32 bg-gradient-cyber opacity-15 rounded-full pointer-events-none blur-xl" />
+
+          <div className="w-12 h-12 mx-auto rounded-full bg-emerald-50 text-signal-ok flex items-center justify-center mb-4">
             <CheckCircle2 className="w-6 h-6" />
           </div>
 
-          <p className="text-xs font-medium text-film uppercase tracking-wider mb-2">
+          <p className="text-xs font-medium text-film uppercase tracking-wider mb-1">
             Nomor Antrean Anda
           </p>
-          <div className="font-display text-6xl font-bold text-ink tabular-nums my-4">
+          <div className="font-display text-6xl font-extrabold bg-gradient-cyber bg-clip-text text-transparent tabular-nums my-4">
             {ticket.number}
           </div>
 
           <h2 className="font-display text-xl font-bold text-ink mb-1">
             Halo, {ticket.nickname}
           </h2>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-chip bg-ultramarine-wash text-ultramarine text-xs font-medium mt-2 mb-6">
-            <span className="w-2 h-2 rounded-full bg-ultramarine animate-pulse" />
+          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-chip bg-gradient-night text-white text-xs font-medium mt-2 mb-6 shadow-violet-glow">
+            <span className="w-2 h-2 rounded-full bg-[#FFD84D] animate-pulse" />
             <span>{ticket.status}</span>
           </div>
 

@@ -13,6 +13,7 @@ import {
   DollarSign,
   AlertCircle,
   Eye,
+  LogOut,
 } from 'lucide-react';
 import { QueueStatus, type QueueStatusType } from '@photobooth/shared';
 
@@ -112,6 +113,17 @@ export default function AdminDashboardPage() {
             <span className="w-2 h-2 rounded-full bg-signal-ok" />
             Booth #1 Online
           </span>
+          <button
+            onClick={() => {
+              document.cookie = 'booth_admin_session=; path=/; max-age=0; SameSite=Lax';
+              window.location.href = '/admin/login';
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-btn border border-sheet text-xs text-ink-soft hover:text-signal-bad hover:bg-red-50 transition-colors"
+            title="Keluar dari sesi operator"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Keluar</span>
+          </button>
         </div>
       </header>
 

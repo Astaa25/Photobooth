@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { Camera, RotateCcw, Check, Sparkles, ArrowRight, QrCode } from 'lucide-react';
+import { Camera, RotateCcw, Check, Sparkles, ArrowRight, QrCode, Lock, KeyRound } from 'lucide-react';
 
 type BoothStep = 'welcome' | 'choosing_design' | 'countdown' | 'flash' | 'review' | 'result';
 
@@ -22,6 +21,10 @@ const TEMPLATES: TemplateOption[] = [
 ];
 
 export default function BoothKioskPage() {
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState(false);
+
   const [step, setStep] = useState<BoothStep>('welcome');
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateOption>(TEMPLATES[0]);
   const [visitorName, setVisitorName] = useState('Diana');
@@ -30,6 +33,34 @@ export default function BoothKioskPage() {
   const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
   const [capturedPhotos, setCapturedPhotos] = useState<string[]>([]);
   const [isFlashActive, setIsFlashActive] = useState(false);
+
+  // Periksa apakah tablet sudah diaktifkan di sesi browser ini
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = sessionStorage.getItem('booth_kiosk_unlocked');
+      if (saved === 'true') {
+        setIsUnlocked(true);
+      }
+    }
+  }, []);
+
+  const handleUnlock = (e: React.FormEvent) => {
+    e.preventDefault();
+    // PIN default operator untuk tablet: 1234
+    if (pinInput === '1234') {
+      setIsUnlocked(true);
+      sessionStorage.setItem('booth_kiosk_unlocked', 'true');
+      setPinError(false);
+    } else {
+      setPinError(true);
+    }
+  };
+
+  const handleLockAgain = () => {
+    setIsUnlocked(false);
+    sessionStorage.removeItem('booth_kiosk_unlocked');
+    setPinInput('');
+  };
 
   // Countdown timer logic
   useEffect(() => {
@@ -69,29 +100,91 @@ export default function BoothKioskPage() {
   };
 
   const retakeSingle = (idx: number) => {
-    // Retake satu foto sesuai PRD F3 (foto lain tidak hilang)
     setCurrentPhotoIdx(idx);
     setCountdownNum(3);
     setStep('countdown');
   };
 
+  // 1. TAMPILAN TERKUNCI JIKA DIBUKA OLEH ORANG LUAR / PENGUNJUNG
+  if (!isUnlocked) {
+    return (
+      <div className="w-screen h-screen bg-[#010030] text-white flex flex-col items-center justify-center p-6 relative select-none overflow-hidden">
+        <div className="absolute w-96 h-96 bg-gradient-cyber opacity-20 blur-3xl pointer-events-none rounded-full" />
+
+        <div className="w-full max-w-sm bg-white/5 border border-white/10 rounded-panel p-8 text-center backdrop-blur shadow-raise-3 relative z-10">
+          <div className="w-14 h-14 rounded-btn bg-gradient-cyber text-white flex items-center justify-center mx-auto mb-4 shadow-cyber-glow">
+            <Lock className="w-7 h-7 text-white" />
+          </div>
+
+          <h1 className="font-display text-2xl font-bold mb-2">
+            Kios Photobooth Terkunci
+          </h1>
+          <p className="text-xs text-white/60 mb-6 leading-relaxed">
+            Layar ini khusus untuk tablet di dalam bilik booth. Masukkan PIN operator untuk mengaktifkan mode kios tablet.
+          </p>
+
+          <form onSubmit={handleUnlock} className="space-y-4">
+            <div className="relative">
+              <input
+                type="password"
+                maxLength={6}
+                value={pinInput}
+                onChange={(e) => {
+                  setPinInput(e.target.value);
+                  setPinError(false);
+                }}
+                placeholder="Masukkan PIN (Default: 1234)"
+                className="w-full h-12 text-center text-lg tracking-widest font-display rounded-btn border border-white/20 bg-black/40 text-white focus:outline-none focus:ring-2 focus:ring-cyber-magenta transition-all"
+              />
+              <KeyRound className="w-4 h-4 text-white/40 absolute left-4 top-4 pointer-events-none" />
+            </div>
+
+            {pinError && (
+              <p className="text-xs text-signal-bad">
+                PIN salah. Hubungi operator booth untuk membuka.
+              </p>
+            )}
+
+            <button
+              type="submit"
+              className="w-full h-12 rounded-btn bg-gradient-cyber text-white font-display font-bold text-sm shadow-cyber-glow transition-all btn-press"
+            >
+              Aktifkan Layar Booth
+            </button>
+          </form>
+
+          <div className="mt-6 pt-4 border-t border-white/10 text-[11px] text-white/40">
+            PIN Default Operator: <span className="text-[#FFD84D] font-mono">1234</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. TAMPILAN KIOS AKTIF DI TABLET
   return (
-    <div className="relative w-screen h-screen bg-[#12151A] text-white flex flex-col justify-between overflow-hidden select-none">
+    <div className="relative w-screen h-screen bg-[#010030] text-white flex flex-col justify-between overflow-hidden select-none">
       {/* Flash Effect Layer (StyleGuide.md: kuning #FFD84D naik 80ms turun 360ms) */}
       {isFlashActive && (
         <div className="absolute inset-0 bg-[#FFD84D] opacity-85 z-50 pointer-events-none transition-opacity duration-300" />
       )}
 
       {/* Header Booth Kiosk */}
-      <header className="px-8 py-5 flex items-center justify-between border-b border-white/10 z-10">
+      <header className="px-8 py-5 flex items-center justify-between border-b border-white/10 z-10 bg-black/20 backdrop-blur">
         <div className="flex items-center gap-3">
-          <span className="w-3 h-3 rounded-full bg-signal-ok" />
+          <span className="w-3 h-3 rounded-full bg-signal-ok animate-pulse" />
           <span className="text-xs font-semibold tracking-wider text-film uppercase">
             Photobooth Kiosk &bull; Canon EOS 1200D
           </span>
         </div>
-        <div className="text-xs text-film">
-          Tiket: <span className="text-[#FFD84D] font-bold font-display text-sm">{ticketNumber}</span>
+        <div className="flex items-center gap-4 text-xs text-film">
+          <span>Tiket: <span className="text-[#FFD84D] font-bold font-display text-base">{ticketNumber}</span></span>
+          <button
+            onClick={handleLockAgain}
+            className="text-[10px] text-white/40 hover:text-white/80 transition-colors"
+          >
+            Kunci Kios
+          </button>
         </div>
       </header>
 
@@ -111,7 +204,7 @@ export default function BoothKioskPage() {
             </p>
             <button
               onClick={() => setStep('choosing_design')}
-              className="h-16 px-10 rounded-btn bg-ultramarine hover:bg-ultramarine-press text-white font-display text-lg font-bold shadow-raise-3 transition-all btn-press flex items-center justify-center gap-3 mx-auto"
+              className="h-16 px-10 rounded-btn bg-gradient-cyber hover:opacity-95 text-white font-display text-lg font-bold shadow-cyber-glow transition-all btn-press flex items-center justify-center gap-3 mx-auto"
             >
               <span>Pilih Desain Foto</span>
               <ArrowRight className="w-5 h-5" />
@@ -136,7 +229,7 @@ export default function BoothKioskPage() {
                   onClick={() => setSelectedTemplate(tpl)}
                   className={`p-5 rounded-panel text-left border transition-all btn-press ${
                     selectedTemplate.slug === tpl.slug
-                      ? 'border-ultramarine bg-ultramarine/20 shadow-raise-2'
+                      ? 'border-cyber-magenta bg-white/10 shadow-cyber-glow'
                       : 'border-white/10 bg-white/5 hover:border-white/20'
                   }`}
                 >
@@ -153,7 +246,7 @@ export default function BoothKioskPage() {
 
             <button
               onClick={startCapture}
-              className="h-16 px-10 rounded-btn bg-ultramarine hover:bg-ultramarine-press text-white font-display text-lg font-bold shadow-raise-3 transition-all btn-press flex items-center justify-center gap-3 mx-auto"
+              className="h-16 px-10 rounded-btn bg-gradient-cyber hover:opacity-95 text-white font-display text-lg font-bold shadow-cyber-glow transition-all btn-press flex items-center justify-center gap-3 mx-auto"
             >
               <Camera className="w-5 h-5" />
               <span>Mulai Sesi Foto ({selectedTemplate.photoCount}x Jepret)</span>
@@ -175,13 +268,13 @@ export default function BoothKioskPage() {
               Foto {currentPhotoIdx + 1} dari {selectedTemplate.photoCount}
             </div>
 
-            {/* Angka Hitung Mundur Raksasa (200dp sesuai StyleGuide.md) */}
+            {/* Angka Hitung Mundur Raksasa */}
             <div className="font-display text-[140px] sm:text-[180px] font-bold text-[#FFD84D] leading-none animate-pulse drop-shadow-lg">
               {countdownNum}
             </div>
 
             <p className="absolute bottom-6 text-xs text-white/60 tracking-wider">
-              Tatap lensa kamera di atas &bull; Senyum!
+              Tatap lensa kamera Canon di atas &bull; Senyum!
             </p>
           </div>
         )}
@@ -218,7 +311,7 @@ export default function BoothKioskPage() {
 
             <button
               onClick={() => setStep('result')}
-              className="h-16 px-10 rounded-btn bg-signal-ok hover:opacity-90 text-white font-display text-lg font-bold shadow-raise-3 transition-all btn-press flex items-center justify-center gap-3 mx-auto"
+              className="h-16 px-10 rounded-btn bg-gradient-cyber hover:opacity-90 text-white font-display text-lg font-bold shadow-cyber-glow transition-all btn-press flex items-center justify-center gap-3 mx-auto"
             >
               <Check className="w-5 h-5" />
               <span>Pakai Foto Ini &amp; Cetak Strip</span>
@@ -262,11 +355,9 @@ export default function BoothKioskPage() {
       </main>
 
       {/* Footer Kiosk */}
-      <footer className="px-8 py-4 border-t border-white/10 flex items-center justify-between text-[11px] text-film z-10">
-        <span>Kios Photobooth Terintegrasi</span>
-        <Link href="/" className="hover:text-white transition-colors underline">
-          Keluar Mode Kios
-        </Link>
+      <footer className="px-8 py-4 border-t border-white/10 flex items-center justify-between text-[11px] text-film z-10 bg-black/20">
+        <span>Photobooth Kiosk Terpadu</span>
+        <span>Mode Standby Aktif</span>
       </footer>
     </div>
   );

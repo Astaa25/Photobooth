@@ -18,6 +18,10 @@
   --signal-warn: #A86400;
   --signal-bad: #B42318;
 
+  /* Gradien Pengguna (#010030, #160078, #7226FF) & (#050C38, #6700A3, #E02F75, #FF5A57) */
+  --gradient-night: linear-gradient(135deg, #010030 0%, #160078 50%, #7226FF 100%);
+  --gradient-cyber: linear-gradient(135deg, #050C38 0%, #6700A3 35%, #E02F75 70%, #FF5A57 100%);
+
   /* Sistem Gerak & Easing (StyleGuide.md) */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
