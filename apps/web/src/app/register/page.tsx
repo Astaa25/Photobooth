@@ -2,8 +2,11 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
 import { VisitorRegistrationSchema } from '@photobooth/shared';
+import { PixelTicketIcon } from '@/components/pixel/PixelIcons';
+import { PixelCrossStar, PixelStreetLamp, PixelVendingMachine } from '@/components/pixel/PixelPosterDecorations';
+import { retroAudio } from '@/utils/audio';
 
 export default function RegisterPage() {
   const [nickname, setNickname] = useState('');
@@ -32,17 +35,18 @@ export default function RegisterPage() {
     setIsSubmitting(true);
 
     try {
-      // Simulasi panggilan endpoint pendaftaran antrean
-      await new Promise((resolve) => setTimeout(resolve, 600));
+      // Simulasi panggilan pendaftaran antrean
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
-      // Contoh pendaftaran berhasil menghasilkan tiket nomor atomik
       const randomTicketNum = Math.floor(Math.random() * 80) + 1;
       const formattedNum = `#${String(randomTicketNum).padStart(3, '0')}`;
+
+      retroAudio.playSuccessChime();
 
       setTicket({
         number: formattedNum,
         nickname,
-        status: 'Dalam Antrean',
+        status: 'DALAM ANTREAN',
       });
     } catch {
       setError('Terjadi kesalahan saat mendaftar. Silakan coba lagi.');
@@ -52,117 +56,151 @@ export default function RegisterPage() {
   };
 
   return (
-    <main className="max-w-md mx-auto px-6 py-12">
-      <Link
-        href="/"
-        className="inline-flex items-center gap-2 text-xs font-medium text-ink-soft hover:text-ink mb-8 transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" />
-        <span>Kembali ke Beranda</span>
-      </Link>
+    <div className="min-h-screen bg-[#050C38] text-white font-pixel flex flex-col justify-between relative overflow-hidden select-none">
+      {/* Background Layer: Gradien Langit Malam & Bintang Pixel */}
+      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#160078] via-[#050C38] to-[#010030] pointer-events-none" />
+      <div className="fixed inset-0 bg-[url('/assets/pixel/stars-a.png')] bg-repeat pixel-art opacity-50 animate-twinkle pointer-events-none" />
+      <div className="fixed bottom-0 left-0 right-0 h-44 bg-[url('/assets/pixel/city-night.png')] bg-repeat-x bg-bottom pixel-art opacity-30 pointer-events-none" />
 
-      {!ticket ? (
-        <div>
-          <div className="mb-8">
-            <h1 className="font-display text-3xl font-bold text-ink mb-2">
-              Daftar Antrean Booth
-            </h1>
-            <p className="text-sm text-ink-soft leading-relaxed">
-              Silakan isi nama panggilan Anda untuk dipanggil ke layar booth saat giliran tiba.
+      {/* Dekorasi Pixel di Sudut Kiri dan Kanan */}
+      <div className="fixed bottom-0 left-8 z-0 hidden lg:block pointer-events-none">
+        <PixelStreetLamp height={120} />
+      </div>
+      <div className="fixed bottom-0 right-8 z-0 hidden lg:block pointer-events-none">
+        <PixelVendingMachine height={110} />
+      </div>
+
+      <main className="max-w-md mx-auto px-6 py-12 relative z-10 w-full flex-1 flex flex-col justify-center">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 text-xs font-pixel-title text-[#A9B8FF] hover:text-[#FFD84D] mb-6 transition-colors self-start"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>&lt;&lt; KEMBALI KE BERANDA</span>
+        </Link>
+
+        {!ticket ? (
+          <div className="bg-[#0C1230]/95 pixel-box-cyber p-8 backdrop-blur">
+            <div className="mb-6 text-center">
+              <div className="w-14 h-14 pixel-box-cyber bg-[#E02F75] text-white flex items-center justify-center mx-auto mb-3">
+                <PixelTicketIcon size={32} />
+              </div>
+
+              <div className="flex items-center justify-center gap-1.5 text-[#FFD84D] mb-1">
+                <PixelCrossStar size={10} />
+                <h1 className="font-pixel-title text-base sm:text-lg tracking-wider">
+                  DAFTAR ANTREAN
+                </h1>
+                <PixelCrossStar size={10} />
+              </div>
+              <p className="text-xs text-[#A9B8FF]">
+                Masukkan nama Anda untuk nomor antrean bilik booth
+              </p>
+            </div>
+
+            {error && (
+              <div className="p-3 mb-5 border-2 border-[#FE0168] bg-[#FE0168]/20 text-[#FF8E72] text-xs font-pixel-title flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-[#FE0168]" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="nickname" className="block text-[11px] font-pixel-title text-[#FFD84D] mb-1.5">
+                  NAMA PANGGILAN <span className="text-[#FE0168]">*</span>
+                </label>
+                <input
+                  id="nickname"
+                  type="text"
+                  required
+                  maxLength={40}
+                  value={nickname}
+                  onChange={(e) => setNickname(e.target.value)}
+                  placeholder="Contoh: Diana"
+                  className="w-full h-11 px-3 border-2 border-[#4B57B2] bg-[#050C38] text-white font-pixel text-xs focus:outline-none focus:border-[#E02F75] transition-all"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="phone" className="block text-[11px] font-pixel-title text-[#A9B8FF] mb-1.5">
+                  NOMOR WHATSAPP (OPSIONAL)
+                </label>
+                <input
+                  id="phone"
+                  type="tel"
+                  maxLength={20}
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="0812xxxxxxxx"
+                  className="w-full h-11 px-3 border-2 border-[#4B57B2] bg-[#050C38] text-white font-pixel text-xs focus:outline-none focus:border-[#E02F75] transition-all"
+                />
+              </div>
+
+              {/* Honeypot Bot Trap */}
+              <div className="hidden" aria-hidden="true">
+                <input
+                  type="text"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  value={honeypot}
+                  onChange={(e) => setHoneypot(e.target.value)}
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full h-12 pixel-btn bg-[#E02F75] hover:bg-[#FE0168] text-white font-pixel-title text-xs tracking-wider transition-all flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
+              >
+                {isSubmitting ? 'MENDAFTAR...' : 'DAPATKAN NOMOR TIKET'}
+              </button>
+            </form>
+          </div>
+        ) : (
+          /* Tiket Berhasil */
+          <div className="bg-[#0C1230]/95 pixel-box-cyber p-8 text-center backdrop-blur animate-fadeIn">
+            <div className="w-12 h-12 pixel-box bg-[#0D5235] text-[#00E599] flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 className="w-6 h-6" />
+            </div>
+
+            <span className="font-pixel-title text-xs text-[#00E599] block mb-1">
+              PENDAFTARAN BERHASIL!
+            </span>
+            <h2 className="font-pixel-title text-base text-white mb-6">
+              HALO, {ticket.nickname}!
+            </h2>
+
+            {/* Tiket Nomor Kartrid */}
+            <div className="p-6 bg-[#050C38] border-4 border-[#FFD84D] mb-6 relative">
+              <span className="text-[10px] font-pixel-title text-[#A9B8FF] block mb-1">
+                NOMOR ANTREAN ANDA:
+              </span>
+              <div className="font-pixel-title text-5xl sm:text-6xl text-[#FFD84D] tracking-wider my-2">
+                {ticket.number}
+              </div>
+              <span className="inline-block px-3 py-1 bg-[#6700A3] text-[#5CE1E6] font-pixel-title text-[10px] border border-[#5CE1E6]/40">
+                [ {ticket.status} ]
+              </span>
+            </div>
+
+            <p className="text-xs text-white/70 mb-6 leading-relaxed">
+              Nomor Anda akan dipanggil di layar bilik booth saat sesi foto siap dimulai.
             </p>
-          </div>
 
-          {error && (
-            <div className="p-4 mb-6 rounded-btn bg-red-50 border border-signal-bad/20 text-signal-bad text-sm flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label htmlFor="nickname" className="block text-xs font-medium text-ink mb-1.5">
-                Nama Panggilan <span className="text-signal-bad">*</span>
-              </label>
-              <input
-                id="nickname"
-                type="text"
-                required
-                maxLength={40}
-                value={nickname}
-                onChange={(e) => setNickname(e.target.value)}
-                placeholder="Contoh: Diana"
-                className="w-full h-12 px-4 rounded-btn border border-sheet bg-paper-raised text-ink text-sm focus:outline-none focus:ring-2 focus:ring-ultramarine focus:border-transparent transition-all"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="phone" className="block text-xs font-medium text-ink mb-1.5">
-                Nomor WhatsApp <span className="text-film">(Opsional, untuk link galeri)</span>
-              </label>
-              <input
-                id="phone"
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="08xxxxxxxxxx"
-                className="w-full h-12 px-4 rounded-btn border border-sheet bg-paper-raised text-ink text-sm focus:outline-none focus:ring-2 focus:ring-ultramarine focus:border-transparent transition-all"
-              />
-            </div>
-
-            {/* Honeypot field - tersembunyi dari pengunjung nyata */}
-            <input
-              type="text"
-              name="website_trap"
-              tabIndex={-1}
-              autoComplete="off"
-              value={honeypot}
-              onChange={(e) => setHoneypot(e.target.value)}
-              className="hidden"
-            />
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full h-12 rounded-btn bg-gradient-cyber hover:opacity-95 text-white font-medium text-sm transition-all btn-press shadow-cyber-glow flex items-center justify-center gap-2 mt-4 disabled:opacity-50"
+            <Link
+              href="/"
+              className="w-full h-12 pixel-btn bg-[#049A5C] hover:bg-[#00E599] text-white font-pixel-title text-xs flex items-center justify-center gap-2"
             >
-              {isSubmitting ? 'Memproses antrean...' : 'Daftar Antrean Sekarang'}
-            </button>
-          </form>
-
-          <p className="mt-8 text-xs text-film text-center leading-relaxed">
-            Data pribadi Anda dilindungi. Nomor telepon hanya digunakan untuk keperluan photobooth dan dihapus otomatis sesuai kebijakan acara.
-          </p>
-        </div>
-      ) : (
-        /* Status Tiket Berhasil */
-        <div className="p-8 bg-paper-raised border border-sheet rounded-panel shadow-raise-2 text-center animate-fadeIn relative overflow-hidden">
-          <div className="absolute -top-12 -right-12 w-32 h-32 bg-gradient-cyber opacity-15 rounded-full pointer-events-none blur-xl" />
-
-          <div className="w-12 h-12 mx-auto rounded-full bg-emerald-50 text-signal-ok flex items-center justify-center mb-4">
-            <CheckCircle2 className="w-6 h-6" />
+              <span>KEMBALI KE BERANDA</span>
+            </Link>
           </div>
+        )}
+      </main>
 
-          <p className="text-xs font-medium text-film uppercase tracking-wider mb-1">
-            Nomor Antrean Anda
-          </p>
-          <div className="font-display text-6xl font-extrabold bg-gradient-cyber bg-clip-text text-transparent tabular-nums my-4">
-            {ticket.number}
-          </div>
-
-          <h2 className="font-display text-xl font-bold text-ink mb-1">
-            Halo, {ticket.nickname}
-          </h2>
-          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-chip bg-gradient-night text-white text-xs font-medium mt-2 mb-6 shadow-violet-glow">
-            <span className="w-2 h-2 rounded-full bg-[#FFD84D] animate-pulse" />
-            <span>{ticket.status}</span>
-          </div>
-
-          <p className="text-xs text-ink-soft leading-relaxed border-t border-sheet pt-4">
-            Harap tetap berada di dekat booth. Nomor Anda akan dipanggil oleh operator dan muncul di layar tablet booth saat giliran tiba.
-          </p>
-        </div>
-      )}
-    </main>
+      <footer className="w-full border-t-4 border-[#4B57B2] py-3 px-6 relative z-10 bg-[#0C1230]/90 text-center text-[10px] text-[#A9B8FF]">
+        EXPO WISUDA TIK 2026 &bull; SISTEM ANTREAN ATOMIK
+      </footer>
+    </div>
   );
 }
