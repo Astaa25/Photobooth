@@ -29,6 +29,9 @@ import {
   CheckCircle,
   HelpCircle,
   FolderOpen,
+  Scan,
+  Maximize2,
+  Crosshair,
 } from 'lucide-react';
 import { QueueStatus, type QueueStatusType } from '@photobooth/shared';
 import {
@@ -39,6 +42,12 @@ import {
 } from '@/components/pixel/PixelIcons';
 import { PixelCrossStar } from '@/components/pixel/PixelPosterDecorations';
 import { retroAudio } from '@/utils/audio';
+import {
+  scanFrameTransparency,
+  getFallbackPreset,
+  type DetectedSlot,
+  type FrameScanResult,
+} from '@/utils/frameScanner';
 
 // Tipe Data Kategori Kolom yang Dapat Dikonfigurasi
 export interface KanbanCategory {
@@ -59,6 +68,8 @@ export interface CustomTemplate {
   previewType: 'strip' | 'grid' | 'trio' | 'duo' | 'single';
   frameImage?: string; // Data URL PNG atau path aset lokal
   isCustom?: boolean;
+  slotRatio?: '4:3' | '16:9' | '3:2';
+  slots?: DetectedSlot[];
 }
 
 interface QueueItem {
@@ -141,9 +152,10 @@ export default function AdminDashboardPage() {
   const [categories, setCategories] = useState<KanbanCategory[]>(DEFAULT_CATEGORIES);
   const [searchQuery, setSearchQuery] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
 
-  // State Desain Frame
+  // State Desain Frame & Pemindai Slot Lubang Landscape
   const [templates, setTemplates] = useState<CustomTemplate[]>(DEFAULT_TEMPLATES);
   const [frameName, setFrameName] = useState('');
   const [frameCount, setFrameCount] = useState<number>(4);
@@ -151,6 +163,14 @@ export default function AdminDashboardPage() {
   const [frameDesc, setFrameDesc] = useState('');
   const [uploadedFramePreview, setUploadedFramePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Fitur Deteksi Lubang Foto (Landscape 4:3, 16:9, 3:2)
+  const [photoRatio, setPhotoRatio] = useState<'4:3' | '16:9' | '3:2'>('4:3');
+  const [detectedSlots, setDetectedSlots] = useState<DetectedSlot[]>([]);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanMessage, setScanMessage] = useState<string | null>(null);
+  const [showCrosshairs, setShowCrosshairs] = useState(true);
+  const [showDemoPhotos, setShowDemoPhotos] = useState(true);
 
   // State Spooler Cetak
   const [printingItem, setPrintingItem] = useState<QueueItem | null>(null);
@@ -263,8 +283,62 @@ export default function AdminDashboardPage() {
   }, [soundEnabled]);
 
   const showToast = (msg: string) => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+    toastTimeoutRef.current = setTimeout(() => {
+      setToastMessage(null);
+      toastTimeoutRef.current = null;
+    }, 2000);
+  };
+
+  // Pindai Otomatis Lubang Transparan pada Frame PNG
+  const runFrameScan = async (sourceImage?: string, ratio: '4:3' | '16:9' | '3:2' = photoRatio) => {
+    const targetSource = sourceImage || uploadedFramePreview;
+    if (!targetSource) {
+      showToast('Pilih / unggah file gambar frame PNG terlebih dahulu.');
+      return;
+    }
+
+    setIsScanning(true);
+    try {
+      const result = await scanFrameTransparency(targetSource, ratio);
+      setDetectedSlots(result.slots);
+      setScanMessage(result.message);
+      if (result.detectedCount > 0) {
+        setFrameCount(result.detectedCount);
+      }
+      showToast(result.message);
+    } catch {
+      const fallback = getFallbackPreset(frameCount, ratio, false, 'Menggunakan tata letak preset.');
+      setDetectedSlots(fallback.slots);
+      setScanMessage(fallback.message);
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  // Ganti Rasio Landscape (4:3 / 16:9 / 3:2)
+  const handleRatioChange = (newRatio: '4:3' | '16:9' | '3:2') => {
+    setPhotoRatio(newRatio);
+    if (uploadedFramePreview) {
+      runFrameScan(uploadedFramePreview, newRatio);
+    } else {
+      const preset = getFallbackPreset(frameCount, newRatio, false);
+      setDetectedSlots(preset.slots);
+      setScanMessage(preset.message);
+    }
+  };
+
+  // Ganti Jumlah Foto Manual
+  const handleFrameCountSelect = (count: number) => {
+    setFrameCount(count);
+    if (!uploadedFramePreview) {
+      const preset = getFallbackPreset(count, photoRatio, false);
+      setDetectedSlots(preset.slots);
+      setScanMessage(preset.message);
+    }
   };
 
   // Update Status Tiket
@@ -317,7 +391,7 @@ export default function AdminDashboardPage() {
       setQueue((prev) =>
         prev.map((q) => (q.id === item.id ? { ...q, status: 'DONE' } : q))
       );
-    }, 2800);
+    }, 2000);
   };
 
   // Handler Upload File Gambar Frame (PNG)
@@ -326,15 +400,16 @@ export default function AdminDashboardPage() {
     if (!file) return;
 
     if (!file.type.includes('png') && !file.type.includes('image')) {
-      showToast('Harap pilih file gambar PNG dengan transparansi.');
+      showToast('Harap pilih file gambar PNG dengan lubang transparan.');
       return;
     }
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const base64 = event.target?.result as string;
       setUploadedFramePreview(base64);
-      showToast('File frame PNG berhasil dimuat untuk pratinjau!');
+      showToast('File PNG dimuat, sedang mendeteksi area lubang foto landscape...');
+      await runFrameScan(base64, photoRatio);
     };
     reader.readAsDataURL(file);
   };
@@ -349,10 +424,12 @@ export default function AdminDashboardPage() {
 
     const payload = {
       name: frameName.trim().toUpperCase(),
-      desc: frameDesc.trim() || `${frameCount} foto 4R kustom`,
+      desc: frameDesc.trim() || `${frameCount} foto 4R (${photoRatio} landscape)`,
       photoCount: frameCount,
       previewType: frameLayout,
       frameImageBase64: uploadedFramePreview || '/assets/frames/night-city-strip.png',
+      slotRatio: photoRatio,
+      slots: detectedSlots,
     };
 
     try {
@@ -668,16 +745,7 @@ export default function AdminDashboardPage() {
           </div>
         </header>
 
-        {/* Notifikasi Toast Mengambang */}
-        {toastMessage && (
-          <div className="absolute top-20 right-6 z-50 p-3 pixel-box bg-[#0C1230] border-2 border-[#5CE1E6] text-[#5CE1E6] text-xs font-pixel-title flex items-center gap-3 shadow-[0_0_15px_rgba(92,225,230,0.5)] animate-fadeIn">
-            <Sparkles className="w-4 h-4 text-[#FFD84D]" />
-            <span>{toastMessage}</span>
-            <button onClick={() => setToastMessage(null)} className="text-white/60 hover:text-white">
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
+
 
         {/* Dialog Spooling Cetak Epson L300 */}
         {printingItem && (
@@ -1036,58 +1104,271 @@ export default function AdminDashboardPage() {
                 </div>
 
                 <form onSubmit={handleSaveFrame} className="space-y-6">
-                  {/* Area Unggah File Gambar Frame PNG */}
-                  <div className="bg-[#131947]/90 pixel-box-cyber p-5">
-                    <label className="block text-xs font-pixel-title text-[#FFD84D] mb-2">
-                      1. PILIH FILE GAMBAR FRAME (PNG TRANSPARAN 1200 x 1800)
+                  {/* Panduan & Penjelasan Deteksi Area Lubang Foto */}
+                  <div className="p-4 bg-[#131947]/90 border-2 border-[#5CE1E6] pixel-box space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-pixel-title text-[#5CE1E6]">
+                      <Scan className="w-4 h-4 text-[#FFD84D]" />
+                      <span>CARA DETEKSI LUBANG FOTO &amp; FORMAT LANDSCAPE:</span>
+                    </div>
+                    <ul className="text-[11px] text-white/80 space-y-1.5 pl-1 leading-relaxed">
+                      <li>
+                        &bull; <strong className="text-[#FFD84D]">Deteksi Transparansi Otomatis:</strong> Unggah file bingkai <span className="text-[#5CE1E6]">PNG 4R (1200 x 1800 px)</span> yang memiliki lubang tembus pandang (<em className="text-[#00E599]">Alpha Channel = 0</em>). Sistem pemindai akan otomatis mengukur posisi slot (X, Y, Lebar, Tinggi) secara presisi.
+                      </li>
+                      <li>
+                        &bull; <strong className="text-[#FFD84D]">Foto Berorientasi Landscape:</strong> Kamera Canon DSLR &amp; webcam mengambil foto secara <span className="text-[#FE0168] font-bold">Landscape (Mendatar)</span>. Pilih rasio kamera Anda (<strong className="text-[#00E599]">4:3</strong> atau <strong className="text-[#00E599]">16:9</strong> atau <strong className="text-[#00E599]">3:2</strong>) agar foto otomatis dipotong dan disematkan pas di balik frame tanpa distorsi.
+                      </li>
+                      <li>
+                        &bull; <strong className="text-[#FFD84D]">Preset Fallback:</strong> Jika frame belum transparan (JPG biasa), sistem otomatis menyusun tata letak landscape simetris sesuai jumlah foto yang dipilih.
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* 1. Pilih Rasio Landscape Kamera */}
+                  <div>
+                    <label className="block text-xs font-pixel-title text-[#FFD84D] mb-2 flex items-center justify-between">
+                      <span>1. PILIH RASIO FOTO LANDSCAPE KAMERA:</span>
+                      <span className="text-[10px] text-[#00E599]">AKTIF: {photoRatio} LANDSCAPE</span>
                     </label>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-                      {/* Kotak Drag & Drop / File Input */}
-                      <div
-                        onClick={() => fileInputRef.current?.click()}
-                        className="cursor-pointer border-2 border-dashed border-[#5CE1E6] bg-[#050C38] p-6 text-center hover:bg-[#0A1647] transition-colors flex flex-col items-center justify-center min-h-[170px]"
-                      >
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/png,image/jpeg,image/webp"
-                          onChange={handleFrameFileUpload}
-                          className="hidden"
-                        />
-                        <Upload className="w-8 h-8 text-[#5CE1E6] mb-2 animate-bounce" />
-                        <span className="font-pixel-title text-xs text-white block mb-1">
-                          KLIK UNTUK UNGGAH FRAME PNG
-                        </span>
-                        <span className="text-[10px] text-white/50">
-                          Format PNG transparan 4R (1200 x 1800 px)
-                        </span>
-                      </div>
-
-                      {/* Pratinjau Gambar Frame yang Diunggah */}
-                      <div className="flex flex-col items-center justify-center bg-[#050C38] p-3 border-2 border-[#4B57B2] min-h-[170px]">
-                        {uploadedFramePreview ? (
-                          <div className="relative w-28 aspect-[2/3] border border-[#FE0168] overflow-hidden shadow-lg">
-                            <img
-                              src={uploadedFramePreview}
-                              alt="Pratinjau Frame"
-                              className="w-full h-full object-contain pixel-art"
-                            />
-                            <span className="absolute bottom-1 left-1 text-[7px] bg-black/80 px-1 text-[#00E599] font-pixel-title">
-                              PNG READY
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {[
+                        {
+                          ratio: '4:3' as const,
+                          title: '4:3 STANDAR LANDSCAPE',
+                          desc: '1600 x 1200 px &bull; Paling umum untuk photobooth & webcam',
+                          badge: 'UMUM',
+                        },
+                        {
+                          ratio: '16:9' as const,
+                          title: '16:9 WIDE LANDSCAPE',
+                          desc: '1920 x 1080 px &bull; Format cinematic widescreen modern',
+                          badge: 'WIDE',
+                        },
+                        {
+                          ratio: '3:2' as const,
+                          title: '3:2 CANON DSLR NATIVE',
+                          desc: '1920 x 1280 px &bull; Rasio sensor native Canon EOS 1200D',
+                          badge: 'DSLR',
+                        },
+                      ].map((item) => (
+                        <button
+                          type="button"
+                          key={item.ratio}
+                          onClick={() => handleRatioChange(item.ratio)}
+                          className={`p-3 text-left pixel-box transition-all ${
+                            photoRatio === item.ratio
+                              ? 'bg-[#160078] text-[#FFD84D] border-2 border-[#5CE1E6] shadow-[0_0_12px_rgba(92,225,230,0.4)]'
+                              : 'bg-[#131947] text-white/70 hover:bg-[#161F54]'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-pixel-title text-xs">{item.title}</span>
+                            <span className="text-[8px] font-pixel-title px-1.5 py-0.5 bg-black/60 border border-white/20 text-[#00E599]">
+                              {item.badge}
                             </span>
                           </div>
-                        ) : (
-                          <div className="text-center text-white/40 text-[10px] font-pixel-title p-4">
-                            [ BELUM ADA GAMBAR FRAME ]<br />
-                            Pratinjau frame akan tampil di sini
-                          </div>
-                        )}
-                      </div>
+                          <span className="text-[10px] text-white/50 block font-normal" dangerouslySetInnerHTML={{ __html: item.desc }} />
+                        </button>
+                      ))}
                     </div>
                   </div>
 
-                  {/* Detail Konfigurasi Frame */}
+                  {/* 2. Area Unggah File Gambar Frame PNG & Scanner Transparansi */}
+                  <div className="bg-[#131947]/90 pixel-box-cyber p-5 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <label className="block text-xs font-pixel-title text-[#FFD84D]">
+                        2. UNGGAH FILE BINGKAI FRAME (PNG TRANSPARAN 1200 x 1800)
+                      </label>
+                      {uploadedFramePreview && (
+                        <button
+                          type="button"
+                          disabled={isScanning}
+                          onClick={() => runFrameScan(uploadedFramePreview, photoRatio)}
+                          className="px-3 py-1.5 pixel-btn bg-[#049A5C] hover:bg-[#00E599] text-white text-[10px] font-pixel-title flex items-center gap-1.5 self-start sm:self-auto"
+                        >
+                          <Scan className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin' : ''}`} />
+                          <span>{isScanning ? 'MEMINDAI ALPHA...' : 'PINDAI ULANG TRANSPARANSI'}</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start">
+                      {/* Kotak Drag & Drop / File Input */}
+                      <div className="space-y-3">
+                        <div
+                          onClick={() => fileInputRef.current?.click()}
+                          className="cursor-pointer border-2 border-dashed border-[#5CE1E6] bg-[#050C38] p-5 text-center hover:bg-[#0A1647] transition-colors flex flex-col items-center justify-center min-h-[190px]"
+                        >
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            onChange={handleFrameFileUpload}
+                            className="hidden"
+                          />
+                          <Upload className="w-8 h-8 text-[#5CE1E6] mb-2 animate-bounce" />
+                          <span className="font-pixel-title text-xs text-white block mb-1">
+                            KLIK / DROP FILE FRAME PNG
+                          </span>
+                          <span className="text-[10px] text-white/50 block">
+                            Ukuran 4R: 1200 x 1800 px (300 DPI)
+                          </span>
+                          <span className="text-[9px] text-[#00E599] mt-2 block bg-black/40 px-2 py-0.5 border border-[#00E599]/30">
+                            ✓ Otomatis Deteksi Slot Lubang Landscape
+                          </span>
+                        </div>
+
+                        {/* Indikator Status Hasil Pemindaian */}
+                        {scanMessage && (
+                          <div className="p-2.5 bg-[#050C38] border border-[#5CE1E6] text-[10px] font-pixel-title text-[#5CE1E6] flex items-center gap-2">
+                            <CheckCircle className="w-4 h-4 text-[#00E599] shrink-0" />
+                            <span className="leading-snug">{scanMessage}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* SIMULATOR PRATINJAU INTERAKTIF FRAME 4R */}
+                      <div className="flex flex-col items-center justify-center bg-[#050C38] p-4 border-2 border-[#4B57B2]">
+                        <div className="flex items-center justify-between w-full mb-2 text-[10px] font-pixel-title text-white/70">
+                          <span>SIMULATOR LIVE PREVIEW 4R</span>
+                          <span className="text-[#FFD84D]">{photoRatio} LANDSCAPE</span>
+                        </div>
+
+                        {/* Kotak Kanvas Frame 4R (Aspect 2/3) */}
+                        <div
+                          className="relative w-56 aspect-[2/3] border-2 border-[#FE0168] shadow-[0_0_20px_rgba(5,12,56,0.9)] overflow-hidden"
+                          style={{
+                            backgroundImage:
+                              'repeating-conic-gradient(#1A2045 0% 25%, #0C1230 0% 50%) 50% / 16px 16px',
+                          }}
+                        >
+                          {/* LAPISAN 1: SLOT FOTO LANDSCAPE BELAKANG */}
+                          {showDemoPhotos && (
+                            <div className="absolute inset-0 pointer-events-none">
+                              {(detectedSlots.length > 0
+                                ? detectedSlots
+                                : getFallbackPreset(frameCount, photoRatio).slots
+                              ).map((slot, sIdx) => (
+                                <div
+                                  key={slot.id}
+                                  className="absolute border border-black/40 overflow-hidden flex flex-col items-center justify-center transition-all shadow-inner"
+                                  style={{
+                                    left: `${slot.xPercent}%`,
+                                    top: `${slot.yPercent}%`,
+                                    width: `${slot.widthPercent}%`,
+                                    height: `${slot.heightPercent}%`,
+                                    backgroundColor: ['#1D4ED8', '#BE185D', '#047857', '#B45309', '#7C3AED', '#C2410C'][
+                                      sIdx % 6
+                                    ],
+                                  }}
+                                >
+                                  <span className="font-pixel-title text-[8px] text-white bg-black/60 px-1 border border-white/20">
+                                    FOTO #{slot.id}
+                                  </span>
+                                  <span className="text-[6px] text-white/80 font-pixel">
+                                    {photoRatio} LANDSCAPE
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* LAPISAN 2: BINGKAI FRAME PNG TENGAH (DENGAN LUBANG TRANSPARAN) */}
+                          {uploadedFramePreview ? (
+                            <img
+                              src={uploadedFramePreview}
+                              alt="Frame PNG Layer"
+                              className="absolute inset-0 w-full h-full object-fill pixel-art pointer-events-none z-10"
+                            />
+                          ) : (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center p-3 text-center z-10 pointer-events-none bg-black/30">
+                              <span className="text-[9px] font-pixel-title text-white/60 mb-1">
+                                [ BELUM ADA FILE FRAME ]
+                              </span>
+                              <span className="text-[7px] text-white/40">
+                                Menggunakan simulasi tata letak preset {frameCount} foto
+                              </span>
+                            </div>
+                          )}
+
+                          {/* LAPISAN 3: OVERLAY GARIS BIDIK NEON (CROSSHAIRS & KOORDINAT) */}
+                          {showCrosshairs && (
+                            <div className="absolute inset-0 pointer-events-none z-20">
+                              {(detectedSlots.length > 0
+                                ? detectedSlots
+                                : getFallbackPreset(frameCount, photoRatio).slots
+                              ).map((slot) => (
+                                <div
+                                  key={`cross-${slot.id}`}
+                                  className="absolute border-2 border-dashed border-[#5CE1E6] animate-pulse"
+                                  style={{
+                                    left: `${slot.xPercent}%`,
+                                    top: `${slot.yPercent}%`,
+                                    width: `${slot.widthPercent}%`,
+                                    height: `${slot.heightPercent}%`,
+                                  }}
+                                >
+                                  <span className="absolute -top-3.5 left-0 text-[6px] font-pixel-title bg-[#0C1230] text-[#5CE1E6] px-1 border border-[#5CE1E6]/50 whitespace-nowrap">
+                                    SLOT #{slot.id} ({slot.aspectRatio})
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Kontrol Toggle Pratinjau Simulator */}
+                        <div className="flex items-center gap-2 mt-3 text-[9px] font-pixel-title">
+                          <button
+                            type="button"
+                            onClick={() => setShowCrosshairs(!showCrosshairs)}
+                            className={`px-2 py-1 pixel-box ${
+                              showCrosshairs ? 'bg-[#5CE1E6] text-black font-bold' : 'bg-[#131947] text-white/60'
+                            }`}
+                          >
+                            <Crosshair className="w-3 h-3 inline mr-1" />
+                            <span>GARIS BIDIK</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowDemoPhotos(!showDemoPhotos)}
+                            className={`px-2 py-1 pixel-box ${
+                              showDemoPhotos ? 'bg-[#00E599] text-black font-bold' : 'bg-[#131947] text-white/60'
+                            }`}
+                          >
+                            <Camera className="w-3 h-3 inline mr-1" />
+                            <span>FOTO CONTOH</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Ringkasan Koordinat Slot Terdeteksi */}
+                    {(detectedSlots.length > 0 || uploadedFramePreview) && (
+                      <div className="pt-2 border-t border-[#4B57B2]/40">
+                        <span className="text-[10px] font-pixel-title text-[#FFD84D] block mb-1.5">
+                          KOORDINAT SLOT LUBANG TERDETEKSI:
+                        </span>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          {(detectedSlots.length > 0
+                            ? detectedSlots
+                            : getFallbackPreset(frameCount, photoRatio).slots
+                          ).map((s) => (
+                            <div key={s.id} className="p-1.5 bg-[#050C38] border border-[#5CE1E6]/40 text-[9px]">
+                              <span className="font-pixel-title text-[#5CE1E6] block">SLOT #{s.id} ({s.aspectRatio})</span>
+                              <span className="text-white/60 block text-[8px]">
+                                X: {s.xPercent}% &bull; Y: {s.yPercent}%
+                              </span>
+                              <span className="text-white/60 block text-[8px]">
+                                L: {s.widthPercent}% &bull; T: {s.heightPercent}%
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3. Detail Nama & Konfigurasi Frame */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[11px] font-pixel-title text-[#FFD84D] mb-1.5">
@@ -1117,10 +1398,11 @@ export default function AdminDashboardPage() {
                     </div>
                   </div>
 
-                  {/* Pilihan Kartu Jumlah Foto (Menggantikan Select Biasa) */}
+                  {/* 4. Pilihan Jumlah Foto / Pose */}
                   <div>
-                    <label className="block text-[11px] font-pixel-title text-[#5CE1E6] mb-2">
-                      2. JUMLAH FOTO / POSE DALAM FRAME:
+                    <label className="block text-[11px] font-pixel-title text-[#5CE1E6] mb-2 flex items-center justify-between">
+                      <span>4. JUMLAH FOTO / POSE DALAM FRAME:</span>
+                      <span className="text-[#FFD84D] text-[10px]">{frameCount} FOTO TERPILIH</span>
                     </label>
                     <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                       {[
@@ -1133,7 +1415,7 @@ export default function AdminDashboardPage() {
                         <button
                           type="button"
                           key={item.count}
-                          onClick={() => setFrameCount(item.count)}
+                          onClick={() => handleFrameCountSelect(item.count)}
                           className={`p-2.5 text-center pixel-box text-[10px] font-pixel-title transition-all ${
                             frameCount === item.count
                               ? 'bg-[#E02F75] text-white border-2 border-[#FFD84D]'
@@ -1146,10 +1428,10 @@ export default function AdminDashboardPage() {
                     </div>
                   </div>
 
-                  {/* Pilihan Kartu Tata Letak Layout */}
+                  {/* 5. Pilihan Tata Letak Fallback Layout */}
                   <div>
                     <label className="block text-[11px] font-pixel-title text-[#5CE1E6] mb-2">
-                      3. TATA LETAK LAYOUT:
+                      5. TATA LETAK LAYOUT:
                     </label>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                       {[
@@ -1179,7 +1461,7 @@ export default function AdminDashboardPage() {
                   {/* Tombol Simpan Frame */}
                   <div className="flex items-center justify-between pt-2 border-t border-[#4B57B2]/40">
                     <span className="text-[10px] text-white/50">
-                      Format: Standar 4R (10x15 cm) &bull; DPI: 300 High Res
+                      Format: Standar 4R (10x15 cm) &bull; DPI: 300 High Res &bull; {photoRatio} Landscape Ready
                     </span>
                     <button
                       type="submit"
@@ -1323,6 +1605,26 @@ export default function AdminDashboardPage() {
           <span>POLITEKNIK NEGERI LHOKSEUMAWE &bull; TIK 2026</span>
         </footer>
       </div>
+
+      {/* =====================================================================
+          3. NOTIFIKASI TOAST FLOATING (POJOK KANAN BAWAH, TIDAK MENUTUPI HEADER / SIDEBAR)
+          ===================================================================== */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-sm px-4 py-2.5 pixel-box bg-[#0C1230]/95 border-2 border-[#5CE1E6] text-white text-xs font-pixel-title flex items-center gap-3 shadow-[0_0_20px_rgba(5,12,56,0.95)] animate-fadeIn">
+          <Sparkles className="w-4 h-4 text-[#FFD84D] shrink-0" />
+          <span className="flex-1 text-[11px] leading-tight text-[#5CE1E6]">{toastMessage}</span>
+          <button
+            onClick={() => {
+              if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+              setToastMessage(null);
+            }}
+            className="p-1 text-white/50 hover:text-white shrink-0"
+            title="Tutup Notifikasi"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

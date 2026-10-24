@@ -10,6 +10,8 @@ export interface FrameTemplateItem {
   previewType: 'strip' | 'grid' | 'trio' | 'duo' | 'single';
   frameImage: string;
   isCustom?: boolean;
+  slotRatio?: '4:3' | '16:9' | '3:2';
+  slots?: any[];
 }
 
 const DEFAULT_TEMPLATES: FrameTemplateItem[] = [
@@ -86,7 +88,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { name, desc, photoCount, previewType, frameImageBase64 } = body;
+    const { name, desc, photoCount, previewType, frameImageBase64, slotRatio, slots } = body;
 
     if (!name || typeof name !== 'string') {
       return NextResponse.json({ success: false, error: 'Nama frame wajib diisi' }, { status: 400 });
@@ -116,6 +118,8 @@ export async function POST(req: Request) {
       previewType: previewType || 'strip',
       frameImage: finalImageUrl,
       isCustom: true,
+      slotRatio: slotRatio || '4:3',
+      slots: Array.isArray(slots) ? slots : undefined,
     };
 
     const existing = await getCustomFrames();
