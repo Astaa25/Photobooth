@@ -166,6 +166,178 @@ export async function requestWebcamStream(deviceId?: string): Promise<{
 let activeSharedStream: MediaStream | null = null;
 let activeSharedDeviceId: string | undefined = undefined;
 let activeSharedLabel: string = 'Kamera Laptop HD';
+let activeSimulatorCleanup: (() => void) | null = null;
+
+/**
+ * Buat MediaStream sintetis / simulator dari HTML5 Canvas 30 FPS
+ * Berguna saat izin kamera ditolak oleh browser/OS sehingga pengguna tetap
+ * dapat mencoba dan menguji alur photobooth tanpa macet atau layar hitam.
+ */
+export function createSimulatorWebcamStream(): {
+  stream: MediaStream;
+  activeDeviceId: string;
+  label: string;
+  cleanup: () => void;
+} {
+  if (typeof document === 'undefined') {
+    throw new Error('Canvas hanya didukung di lingkungan browser.');
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 1280;
+  canvas.height = 720;
+  const ctx = canvas.getContext('2d')!;
+
+  let animationFrameId: number;
+  let frameCount = 0;
+
+  const drawFrame = () => {
+    frameCount++;
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('id-ID', { hour12: false });
+    const ms = String(now.getMilliseconds()).padStart(3, '0');
+
+    // Latar belakang gradien simulator cyberpunk
+    const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    grad.addColorStop(0, '#050C38');
+    grad.addColorStop(0.5, '#160078');
+    grad.addColorStop(1, '#0C1230');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Grid garis retro
+    ctx.strokeStyle = 'rgba(92, 225, 230, 0.12)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x < canvas.width; x += 64) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
+      ctx.stroke();
+    }
+    for (let y = 0; y < canvas.height; y += 64) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+    }
+
+    // Karakter Pengunjung Beranimasi (Simulasi Pose Wajah Dinamis)
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2 + Math.sin(frameCount * 0.05) * 12;
+
+    // Rambut / Topi Wisuda Pixel
+    ctx.fillStyle = '#050C38';
+    ctx.fillRect(centerX - 90, centerY - 150, 180, 40);
+    ctx.fillStyle = '#FFD84D';
+    ctx.fillRect(centerX + 60, centerY - 130, 12, 50);
+
+    // Wajah / Kepala
+    ctx.fillStyle = '#FFD84D';
+    ctx.beginPath();
+    ctx.arc(centerX, centerY - 50, 85, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Kacamata / Mata Pixel
+    ctx.fillStyle = '#050C38';
+    ctx.fillRect(centerX - 45, centerY - 70, 25, 20);
+    ctx.fillRect(centerX + 20, centerY - 70, 25, 20);
+    ctx.fillRect(centerX - 20, centerY - 65, 40, 6);
+
+    // Senyum Ramah
+    ctx.strokeStyle = '#050C38';
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY - 35, 35, 0.2, Math.PI - 0.2);
+    ctx.stroke();
+
+    // Pipi Merona
+    ctx.fillStyle = 'rgba(254, 1, 104, 0.4)';
+    ctx.beginPath();
+    ctx.arc(centerX - 55, centerY - 35, 15, 0, Math.PI * 2);
+    ctx.arc(centerX + 55, centerY - 35, 15, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Jubah Wisuda Biru TIK
+    ctx.fillStyle = '#160078';
+    ctx.beginPath();
+    ctx.ellipse(centerX, centerY + 160, 180, 110, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Kalung Gordon Wisuda Emas
+    ctx.strokeStyle = '#FFD84D';
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY + 110, 70, 0, Math.PI);
+    ctx.stroke();
+
+    // Bracket Kotak Bidik Wajah
+    ctx.strokeStyle = '#00E599';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(centerX - 120, centerY - 160, 240, 250);
+
+    // Telemetri HUD Atas
+    ctx.fillStyle = '#00E599';
+    ctx.font = 'bold 22px monospace';
+    ctx.fillText(`● SIMULATOR KAMERA WEBCAM 720P (LIVE FEED)`, 40, 50);
+
+    ctx.fillStyle = '#FFD84D';
+    ctx.font = '18px monospace';
+    ctx.fillText(`TIME: ${timeStr}.${ms} | FPS: 30 | STATUS: AKTIF`, 40, 82);
+
+    // Pesan Panduan Bawah
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.font = '15px sans-serif';
+    ctx.fillText('Simulator siap untuk pengujian countdown, jepret pose, cetak 4R, dan review tanpa perlu webcam fisik.', 40, canvas.height - 35);
+
+    animationFrameId = requestAnimationFrame(drawFrame);
+  };
+
+  drawFrame();
+
+  const stream = (canvas as any).captureStream ? (canvas as any).captureStream(30) : null;
+
+  if (!stream) {
+    throw new Error('Browser tidak mendukung canvas captureStream.');
+  }
+
+  const cleanup = () => {
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    stopWebcamStream(stream);
+  };
+
+  return {
+    stream,
+    activeDeviceId: 'simulator-virtual-webcam',
+    label: 'Simulator Kamera Laptop (Live Test Feed)',
+    cleanup,
+  };
+}
+
+/**
+ * Aktifkan simulator stream secara global
+ */
+export function useSimulatorStream(): {
+  stream: MediaStream;
+  activeDeviceId: string;
+  label: string;
+} {
+  if (activeSharedStream) {
+    stopWebcamStream(activeSharedStream);
+    activeSharedStream = null;
+  }
+  if (activeSimulatorCleanup) {
+    activeSimulatorCleanup();
+    activeSimulatorCleanup = null;
+  }
+
+  const sim = createSimulatorWebcamStream();
+  activeSharedStream = sim.stream;
+  activeSharedDeviceId = sim.activeDeviceId;
+  activeSharedLabel = sim.label;
+  activeSimulatorCleanup = sim.cleanup;
+
+  return sim;
+}
 
 /**
  * Dapatkan stream webcam bersama (singleton) yang aman dari benturan hardware
@@ -178,6 +350,18 @@ export async function getSharedWebcamStream(
   activeDeviceId?: string;
   label?: string;
 }> {
+  // Jika sedang memakai simulator virtual
+  if (deviceId === 'simulator-virtual-webcam' || activeSharedDeviceId === 'simulator-virtual-webcam') {
+    if (activeSharedStream && activeSharedStream.active) {
+      return {
+        stream: activeSharedStream,
+        activeDeviceId: activeSharedDeviceId,
+        label: activeSharedLabel,
+      };
+    }
+    return useSimulatorStream();
+  }
+
   // Jika stream sudah aktif, track masih live, dan deviceId sesuai, gunakan kembali
   if (
     !forceRefresh &&
@@ -199,6 +383,10 @@ export async function getSharedWebcamStream(
     stopWebcamStream(activeSharedStream);
     activeSharedStream = null;
   }
+  if (activeSimulatorCleanup) {
+    activeSimulatorCleanup();
+    activeSimulatorCleanup = null;
+  }
 
   const result = await requestWebcamStream(deviceId);
   activeSharedStream = result.stream;
@@ -212,6 +400,10 @@ export async function getSharedWebcamStream(
  * Hentikan dan bersihkan stream singleton webcam
  */
 export function releaseSharedWebcamStream(): void {
+  if (activeSimulatorCleanup) {
+    activeSimulatorCleanup();
+    activeSimulatorCleanup = null;
+  }
   if (activeSharedStream) {
     stopWebcamStream(activeSharedStream);
     activeSharedStream = null;

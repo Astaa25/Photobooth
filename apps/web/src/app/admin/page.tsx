@@ -50,7 +50,7 @@ import {
   type FrameScanResult,
 } from '@/utils/frameScanner';
 import {
-  requestWebcamStream,
+  getSharedWebcamStream,
   bindStreamToVideo,
   stopWebcamStream,
   getHumanWebcamError,
@@ -160,6 +160,7 @@ export default function AdminDashboardPage() {
   const [templates, setTemplates] = useState<CustomTemplate[]>(DEFAULT_TEMPLATES);
   const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<FrameTemplateItem | null>(null);
+  const [showLegacyScanner, setShowLegacyScanner] = useState(false);
   const [frameName, setFrameName] = useState('');
   const [frameCount, setFrameCount] = useState<number>(4);
   const [frameLayout, setFrameLayout] = useState<'strip' | 'grid' | 'trio' | 'duo' | 'single'>('strip');
@@ -287,7 +288,7 @@ export default function AdminDashboardPage() {
     adminWebcamStreamRef.current = null;
 
     try {
-      const result = await requestWebcamStream();
+      const result = await getSharedWebcamStream();
       adminWebcamStreamRef.current = result.stream;
       await bindStreamToVideo(adminWebcamVideoRef.current, result.stream);
 
@@ -295,7 +296,7 @@ export default function AdminDashboardPage() {
       setWebcamDevices(devList);
       showToast('Kamera laptop terhubung! Feed live video aktif.');
     } catch (err: any) {
-      console.error('Koneksi kamera laptop admin gagal:', err);
+      console.warn('Status koneksi webcam admin:', err?.name || err?.message || err);
       const humanErr = getHumanWebcamError(err);
       setAdminWebcamError(humanErr);
       showToast('Kamera laptop: ' + humanErr);
@@ -791,7 +792,7 @@ export default function AdminDashboardPage() {
               }`}
             >
               <Palette className="w-4 h-4 text-[#E02F75]" />
-              <span>KELOLA FRAME ({templates.length})</span>
+              <span>KELOLA TEMPLATE & FRAME ({templates.length})</span>
             </button>
 
             <button
@@ -1241,7 +1242,121 @@ export default function AdminDashboardPage() {
               ================================================================= */}
           {activeTab === 'frames' && (
             <div className="max-w-4xl mx-auto space-y-6">
-              {/* Form Unggah & Pengaturan Frame Baru */}
+              {/* DAFTAR TEMPLATE FRAME AKTIF (HERO UTAMA - PERSIS GAMBAR 1 & 2) */}
+              <div className="bg-[#0C1230]/95 pixel-box p-6 border-2 border-[#5CE1E6] shadow-[0_0_20px_rgba(92,225,230,0.2)]">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-4 border-b-2 border-[#4B57B2]">
+                  <div>
+                    <h3 className="font-pixel-title text-sm sm:text-base text-[#FFD84D] flex items-center gap-2">
+                      <Layers className="w-5 h-5 text-[#5CE1E6]" />
+                      <span>DAFTAR TEMPLATE FRAME BOOTH ({templates.length})</span>
+                    </h3>
+                    <p className="text-xs text-[#A9B8FF] mt-1">
+                      Sistem desain template standar cetak 4R (1200×1800 px) sesuai Gambar 1 &amp; 2. Klik Tambah / Ubah untuk membuka modal.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleOpenAddTemplate}
+                    className="px-5 py-2.5 pixel-btn bg-[#FFD84D] hover:bg-[#FFE57F] text-[#050C38] text-xs font-pixel-title font-bold flex items-center justify-center gap-2 shadow-[4px_4px_0_0_#A07800] active:scale-95 shrink-0"
+                  >
+                    <Plus className="w-4 h-4 stroke-[3]" />
+                    <span>+ TAMBAH TEMPLATE (GAMBAR 1)</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  {templates.map((tpl) => (
+                    <div
+                      key={tpl.slug}
+                      className="bg-[#131947]/90 pixel-box p-4 flex flex-col justify-between border border-[#4B57B2]/70 hover:border-[#5CE1E6] transition-all"
+                    >
+                      <div>
+                        {/* Pratinjau Kanvas 4R Proporsional */}
+                        <div
+                          className="aspect-[2/3] w-28 mx-auto border-2 border-[#4B57B2] mb-3 overflow-hidden flex items-center justify-center p-1 relative shadow-inner"
+                          style={{ backgroundColor: tpl.bgColor || '#050C38' }}
+                        >
+                          {tpl.frameImage ? (
+                            <img
+                              src={tpl.frameImage}
+                              alt={tpl.name}
+                              className="w-full h-full object-contain pixel-art z-10"
+                            />
+                          ) : (
+                            <div className="text-[9px] text-white/50 font-pixel-title text-center z-10">
+                              {(tpl.previewType || '4R').toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-between mb-1">
+                          <h4 className="font-pixel-title text-xs text-[#FFD84D] truncate" title={tpl.name}>
+                            {tpl.name}
+                          </h4>
+                          {tpl.isCustom ? (
+                            <span className="text-[8px] font-pixel-title bg-[#E02F75] px-1.5 py-0.5 text-white">
+                              KUSTOM
+                            </span>
+                          ) : (
+                            <span className="text-[8px] font-pixel-title bg-[#160078] px-1.5 py-0.5 text-[#5CE1E6] border border-[#5CE1E6]/40">
+                              DEFAULT
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-white/70 mb-3 leading-snug line-clamp-2">
+                          {tpl.desc}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-between pt-2.5 border-t border-[#4B57B2]/50 text-[9px] font-pixel-title gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditTemplate(tpl)}
+                            className="px-3 py-1.5 pixel-btn bg-[#FFD84D] hover:bg-[#FFE57F] text-[#050C38] flex items-center gap-1.5 font-bold shadow-sm active:scale-95"
+                            title="Buka Modal Ubah Template (Gambar 1)"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                            <span>UBAH TEMPLATE</span>
+                          </button>
+                        </div>
+                        <span className="text-[#00E599] font-bold">{tpl.photoCount} FOTO &bull; 4R</span>
+                        {tpl.isCustom && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteFrame(tpl.slug)}
+                            className="p-1 text-[#FE0168] hover:text-white"
+                            title="Hapus Template Kustom"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* ACCORDION: ALAT PEMINDAI ALPHA TRANSPARANSI PNG (OPSIONAL) */}
+              <div className="bg-[#0C1230]/95 pixel-box border border-[#4B57B2]/70 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setShowLegacyScanner(!showLegacyScanner)}
+                  className="w-full p-4 bg-[#131947]/80 hover:bg-[#160078] flex items-center justify-between text-left text-xs font-pixel-title text-[#5CE1E6] transition-all"
+                >
+                  <div className="flex items-center gap-2">
+                    <Scan className="w-4 h-4 text-[#FFD84D]" />
+                    <span>ALAT PEMINDAI ALPHA TRANSPARANSI PNG &amp; RASIO LANDSCAPE (OPSIONAL)</span>
+                  </div>
+                  <span className="text-[10px] text-white/60 font-pixel">
+                    {showLegacyScanner ? '▲ SEMBUNYIKAN ALAT' : '▼ BUKA ALAT PEMINDAI'}
+                  </span>
+                </button>
+
+                {showLegacyScanner && (
+                  <div className="p-6 border-t border-[#4B57B2]/60">
+                    {/* Form Unggah & Pengaturan Frame Baru */}
               <div className="bg-[#0C1230]/95 pixel-box p-6">
                 <div className="mb-6 pb-3 border-b-2 border-[#4B57B2] flex items-center justify-between">
                   <div>
@@ -1627,108 +1742,13 @@ export default function AdminDashboardPage() {
                   </div>
                 </form>
               </div>
-
-              {/* Daftar Semua Frame Aktif */}
-              <div className="bg-[#0C1230]/95 pixel-box p-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-[#4B57B2]/40">
-                  <h3 className="font-pixel-title text-xs text-[#5CE1E6] flex items-center gap-2">
-                    <Layers className="w-4 h-4" />
-                    <span>DAFTAR DESAIN FRAME AKTIF DI BOOTH ({templates.length})</span>
-                  </h3>
-
-                  <button
-                    type="button"
-                    onClick={handleOpenAddTemplate}
-                    className="px-4 py-2 pixel-btn bg-[#FFD84D] hover:bg-[#FFE57F] text-[#050C38] text-xs font-pixel-title font-bold flex items-center gap-1.5 shadow"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>+ TAMBAH TEMPLATE (MODAL 4R)</span>
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  {templates.map((tpl) => (
-                    <div
-                      key={tpl.slug}
-                      className="bg-[#131947]/80 pixel-box p-3.5 flex flex-col justify-between"
-                    >
-                      <div>
-                        {/* Pratinjau Gambar Frame */}
-                        <div className="aspect-[2/3] w-28 mx-auto bg-black border-2 border-[#4B57B2] mb-3 overflow-hidden flex items-center justify-center p-1">
-                          {tpl.frameImage ? (
-                            <img
-                              src={tpl.frameImage}
-                              alt={tpl.name}
-                              className="w-full h-full object-contain pixel-art"
-                            />
-                          ) : (
-                            <div className="text-[8px] text-white/40 font-pixel-title text-center">
-                              {tpl.previewType.toUpperCase()}
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex items-center justify-between mb-1">
-                          <h4 className="font-pixel-title text-xs text-[#FFD84D] truncate">{tpl.name}</h4>
-                          {tpl.isCustom && (
-                            <span className="text-[8px] font-pixel-title bg-[#E02F75] px-1 text-white">
-                              KUSTOM
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-[10px] text-white/60 mb-2 leading-snug">{tpl.desc}</p>
-                      </div>
-
-                      <div className="flex flex-wrap items-center justify-between pt-2 border-t border-[#4B57B2]/40 text-[9px] font-pixel-title gap-2">
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEditTemplate(tpl)}
-                            className="px-2.5 py-1 pixel-btn bg-[#FFD84D] hover:bg-[#FFE57F] text-[#050C38] flex items-center gap-1 font-bold shadow-sm"
-                            title="Ubah Konfigurasi Slot & Template (Gambar 1)"
-                          >
-                            <Edit3 className="w-3 h-3" />
-                            <span>UBAH</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setUploadedFramePreview(tpl.frameImage || null);
-                              setFrameName(tpl.name);
-                              setFrameDesc(tpl.desc);
-                              setFrameLayout(tpl.previewType);
-                              setFrameCount(tpl.photoCount);
-                              if (tpl.frameImage) {
-                                runFrameScan(tpl.frameImage, photoRatio);
-                              }
-                              showToast(`Template "${tpl.name}" dimuat ke simulator pemindai!`);
-                            }}
-                            className="px-2 py-1 pixel-btn bg-[#6700A3] hover:bg-[#E02F75] text-white flex items-center gap-1 shadow-sm"
-                            title="Tampilkan & Pindai di Simulator"
-                          >
-                            <Scan className="w-3 h-3" />
-                            <span>PINDAI</span>
-                          </button>
-                        </div>
-                        <span className="text-[#00E599]">{tpl.photoCount} FOTO &bull; 4R</span>
-                        {tpl.isCustom && (
-                          <button
-                            onClick={() => handleDeleteFrame(tpl.slug)}
-                            className="p-1 text-[#FE0168] hover:text-white"
-                            title="Hapus"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
-          {/* =================================================================
+                    {/* =================================================================
               TAB 4: MONITOR HARDWARE (CANON EOS 1200D & EPSON L300)
               ================================================================= */}
           {activeTab === 'hardware' && (

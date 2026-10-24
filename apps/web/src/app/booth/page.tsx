@@ -23,6 +23,7 @@ import {
 import { retroAudio } from '@/utils/audio';
 import {
   getSharedWebcamStream,
+  useSimulatorStream,
   bindStreamToVideo,
   stopWebcamStream,
   getHumanWebcamError,
@@ -204,8 +205,25 @@ export default function BoothKioskPage() {
       const devs = await enumerateVideoDevices();
       setWebcamDevices(devs);
     } catch (err: any) {
+      console.warn('Status koneksi webcam saat uji coba:', err?.name || err?.message || err);
       setWebcamStatus('error');
       setWebcamErrorMsg(getHumanWebcamError(err));
+    }
+  };
+
+  // Aktifkan simulator webcam virtual langsung ke video modal
+  const handleUseSimulatorInModal = async () => {
+    try {
+      const sim = useSimulatorStream();
+      setWebcamStatus('connected');
+      setWebcamErrorMsg(null);
+      if (testVideoRef.current) {
+        await bindStreamToVideo(testVideoRef.current, sim.stream);
+      }
+      const devs = await enumerateVideoDevices().catch(() => []);
+      setWebcamDevices(devs);
+    } catch (err: any) {
+      console.warn('Simulator error:', err);
     }
   };
 
@@ -894,8 +912,16 @@ export default function BoothKioskPage() {
 
               {/* Pesan Error & Solusi jika Ada */}
               {cameraSource === 'webcam' && webcamStatus === 'error' && (
-                <div className="mt-2 p-2 bg-[#FE0168]/20 border border-[#FE0168] text-[10px] text-[#FFD84D] leading-tight font-sans">
-                  {webcamErrorMsg || 'Browser belum mengizinkan akses kamera webcam.'}
+                <div className="mt-2 p-2.5 bg-[#FE0168]/20 border border-[#FE0168] text-[10px] text-[#FFD84D] leading-tight font-sans">
+                  <p className="mb-2">{webcamErrorMsg || 'Browser belum mengizinkan akses kamera webcam.'}</p>
+                  <button
+                    type="button"
+                    onClick={handleUseSimulatorInModal}
+                    className="w-full py-1.5 pixel-btn bg-[#FFD84D] hover:bg-[#FFE57F] text-[#050C38] text-[9px] font-pixel-title font-bold flex items-center justify-center gap-1 shadow-sm active:scale-95"
+                  >
+                    <Sparkles className="w-3 h-3 text-[#E02F75]" />
+                    <span>🎭 AKTIFKAN SIMULATOR KAMERA (30 FPS)</span>
+                  </button>
                 </div>
               )}
             </div>
@@ -1180,14 +1206,53 @@ export default function BoothKioskPage() {
               />
 
               {webcamStatus === 'connected' && (
-                <div className="absolute top-2 left-2 bg-black/75 px-2 py-0.5 border border-[#00E599] text-[#00E599] text-[9px] font-pixel-title flex items-center gap-1">
+                <div className="absolute top-2 left-2 bg-black/75 px-2 py-0.5 border border-[#00E599] text-[#00E599] text-[9px] font-pixel-title flex items-center gap-1 z-10">
                   <span className="w-1.5 h-1.5 bg-[#00E599] animate-pulse" />
-                  <span>LIVE 720P HD</span>
+                  <span>LIVE KAMERA AKTIF</span>
+                </div>
+              )}
+
+              {/* Overlay Error Izin Ditolak Browser */}
+              {webcamStatus === 'error' && (
+                <div className="absolute inset-0 bg-black/95 p-4 flex flex-col items-center justify-center text-center z-20">
+                  <div className="w-10 h-10 bg-[#FE0168]/20 border border-[#FE0168] text-[#FE0168] flex items-center justify-center mb-2">
+                    <AlertTriangle className="w-5 h-5 animate-bounce" />
+                  </div>
+                  <h4 className="text-xs font-pixel-title text-[#FFD84D] mb-1">
+                    IZIN KAMERA DIBLOKIR BROWSER
+                  </h4>
+                  <div className="text-[10px] text-white/80 max-w-sm mb-3 leading-relaxed font-sans bg-[#131947]/90 p-2.5 border border-[#4B57B2] text-left">
+                    <p className="font-bold text-[#5CE1E6] mb-1">Cara Membuka Izin di Chrome / Edge:</p>
+                    <ol className="list-decimal list-inside space-y-1 text-white/70">
+                      <li>Klik ikon 🔒 (Gembok / Setelan Situs) di bilah URL <code className="text-[#FFD84D]">localhost:3000</code></li>
+                      <li>Ubah opsi <strong>Kamera</strong> menjadi <strong>Izinkan (Allow)</strong></li>
+                      <li>Klik tombol <em>Coba Hubungkan Lagi</em></li>
+                    </ol>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleOpenWebcamTest}
+                      className="px-3 py-1.5 pixel-btn bg-[#00E599] hover:bg-[#5CE1E6] text-[#050C38] text-[10px] font-pixel-title font-bold flex items-center gap-1 active:scale-95"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>COBA HUBUNGKAN LAGI</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleUseSimulatorInModal}
+                      className="px-3 py-1.5 pixel-btn bg-[#E02F75] hover:bg-[#FE0168] text-white text-[10px] font-pixel-title font-bold flex items-center gap-1 shadow active:scale-95"
+                      title="Gunakan simulasi live feed 30 FPS untuk pengujian booth"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-[#FFD84D]" />
+                      <span>🎭 GUNAKAN SIMULATOR KAMERA</span>
+                    </button>
+                  </div>
                 </div>
               )}
 
               {testSnapshotUrl && (
-                <div className="absolute bottom-2 right-2 w-24 aspect-[4/3] border-2 border-[#FFD84D] shadow-lg overflow-hidden bg-black">
+                <div className="absolute bottom-2 right-2 w-24 aspect-[4/3] border-2 border-[#FFD84D] shadow-lg overflow-hidden bg-black z-10">
                   <img src={testSnapshotUrl} alt="Hasil Snapshot" className="w-full h-full object-cover" />
                 </div>
               )}
@@ -1203,9 +1268,13 @@ export default function BoothKioskPage() {
                   value={selectedWebcamId}
                   onChange={(e) => {
                     setSelectedWebcamId(e.target.value);
-                    getSharedWebcamStream(e.target.value, true).then((res) => {
-                      if (testVideoRef.current) bindStreamToVideo(testVideoRef.current, res.stream);
-                    });
+                    getSharedWebcamStream(e.target.value, true)
+                      .then((res) => {
+                        if (testVideoRef.current) bindStreamToVideo(testVideoRef.current, res.stream);
+                      })
+                      .catch((err) => {
+                        console.warn('Gagal beralih device kamera:', err);
+                      });
                   }}
                   className="w-full bg-[#050C38] border-2 border-[#4B57B2] text-xs text-white p-2 outline-none font-pixel"
                 >

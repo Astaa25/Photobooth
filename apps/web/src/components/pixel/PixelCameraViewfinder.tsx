@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, Laptop, RefreshCw, VideoOff, Check, AlertTriangle } from 'lucide-react';
+import { Camera, Laptop, RefreshCw, VideoOff, Check, AlertTriangle, Sparkles } from 'lucide-react';
 import {
   getSharedWebcamStream,
+  useSimulatorStream,
   bindStreamToVideo,
   stopWebcamStream,
   getHumanWebcamError,
@@ -75,9 +76,28 @@ export function PixelCameraViewfinder({
       const devList = await enumerateVideoDevices();
       setDevices(devList);
     } catch (err: any) {
-      console.error('Koneksi kamera laptop gagal:', err);
+      console.warn('Status koneksi webcam laptop:', err?.name || err?.message || err);
       setHasWebcamStream(false);
       setWebcamError(getHumanWebcamError(err));
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  // Aktifkan simulator kamera virtual jika izin browser diblokir
+  const handleUseSimulator = async () => {
+    setIsConnecting(true);
+    setWebcamError(null);
+    try {
+      const sim = useSimulatorStream();
+      currentStreamRef.current = sim.stream;
+      setWebcamLabel(sim.label);
+      setSelectedDeviceId(sim.activeDeviceId);
+      await bindStreamToVideo(videoRef.current, sim.stream);
+      setHasWebcamStream(true);
+      setWebcamError(null);
+    } catch (err: any) {
+      console.warn('Simulator stream error:', err?.message || err);
     } finally {
       setIsConnecting(false);
     }
@@ -112,7 +132,7 @@ export function PixelCameraViewfinder({
           }
         }
       } catch (err) {
-        console.error('Error capturing webcam photo:', err);
+        console.warn('Peringatan saat mengambil snapshot video:', err);
       }
     }
   }, [countdownNum, cameraSource, onSnapshotCapture]);
@@ -149,14 +169,14 @@ export function PixelCameraViewfinder({
 
       {/* 0C. State Error / Belum Terhubung (Instruksi Jelas & Solutif) */}
       {cameraSource === 'webcam' && webcamError && !hasWebcamStream && (
-        <div className="absolute inset-4 z-25 flex flex-col items-center justify-center bg-[#0C1230]/95 border-2 border-[#FE0168] p-5 text-center my-auto shadow-[0_0_30px_rgba(254,1,104,0.4)]">
-          <div className="w-12 h-12 bg-[#FE0168]/20 border border-[#FE0168] text-[#FE0168] flex items-center justify-center mb-3">
-            <VideoOff className="w-6 h-6 animate-pulse" />
+        <div className="absolute inset-3 z-25 flex flex-col items-center justify-center bg-[#0C1230]/95 border-2 border-[#FE0168] p-4 text-center my-auto shadow-[0_0_30px_rgba(254,1,104,0.4)]">
+          <div className="w-10 h-10 bg-[#FE0168]/20 border border-[#FE0168] text-[#FE0168] flex items-center justify-center mb-2">
+            <VideoOff className="w-5 h-5 animate-pulse" />
           </div>
-          <h3 className="font-pixel-title text-xs sm:text-sm text-[#FFD84D] mb-2">
-            KAMERA LAPTOP BELUM TERHUBUNG
+          <h3 className="font-pixel-title text-xs sm:text-sm text-[#FFD84D] mb-1.5">
+            IZIN KAMERA DIBLOKIR / BELUM TERHUBUNG
           </h3>
-          <p className="text-[11px] text-white/85 mb-4 max-w-md leading-relaxed font-sans bg-black/50 p-2.5 border border-white/10">
+          <p className="text-[11px] text-white/85 mb-3 max-w-md leading-relaxed font-sans bg-black/50 p-2 border border-white/10">
             {webcamError}
           </p>
 
@@ -164,16 +184,25 @@ export function PixelCameraViewfinder({
             <button
               type="button"
               onClick={() => connectWebcam()}
-              className="px-4 py-2 pixel-btn bg-[#00E599] hover:bg-[#5CE1E6] text-[#050C38] text-[11px] font-pixel-title font-bold flex items-center gap-1.5 shadow-sm"
+              className="px-3 py-1.5 pixel-btn bg-[#00E599] hover:bg-[#5CE1E6] text-[#050C38] text-[10px] font-pixel-title font-bold flex items-center gap-1.5 shadow-sm active:scale-95"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               <span>COBA HUBUNGKAN LAGI</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleUseSimulator}
+              className="px-3 py-1.5 pixel-btn bg-[#E02F75] hover:bg-[#FE0168] text-white text-[10px] font-pixel-title font-bold flex items-center gap-1.5 shadow-sm active:scale-95"
+              title="Gunakan simulasi live camera 30 FPS untuk mencoba sesi booth"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-[#FFD84D]" />
+              <span>GUNAKAN SIMULATOR KAMERA</span>
             </button>
             {onSwitchCamera && (
               <button
                 type="button"
                 onClick={() => onSwitchCamera('canon')}
-                className="px-4 py-2 pixel-btn bg-[#131947] hover:bg-[#160078] text-[#FFD84D] text-[11px] font-pixel-title flex items-center gap-1.5 border border-[#4B57B2]"
+                className="px-3 py-1.5 pixel-btn bg-[#131947] hover:bg-[#160078] text-[#FFD84D] text-[10px] font-pixel-title flex items-center gap-1.5 border border-[#4B57B2] active:scale-95"
               >
                 <Camera className="w-3.5 h-3.5 text-[#00E599]" />
                 <span>GANTI KE CANON 1200D</span>
