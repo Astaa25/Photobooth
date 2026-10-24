@@ -49,6 +49,14 @@ import {
   type DetectedSlot,
   type FrameScanResult,
 } from '@/utils/frameScanner';
+import {
+  requestWebcamStream,
+  bindStreamToVideo,
+  stopWebcamStream,
+  getHumanWebcamError,
+  enumerateVideoDevices,
+  type WebcamDeviceInfo,
+} from '@/utils/webcamHelper';
 
 // Tipe Data Kategori Kolom yang Dapat Dikonfigurasi
 export interface KanbanCategory {
@@ -188,7 +196,11 @@ export default function AdminDashboardPage() {
   // State Sumber Kamera (DSLR Canon EOS 1200D vs Kamera Laptop HD Webcam)
   const [activeCamera, setActiveCamera] = useState<'canon' | 'webcam'>('canon');
   const [webcamTestActive, setWebcamTestActive] = useState(false);
+  const [adminWebcamError, setAdminWebcamError] = useState<string | null>(null);
+  const [isAdminWebcamConnecting, setIsAdminWebcamConnecting] = useState(false);
+  const [webcamDevices, setWebcamDevices] = useState<WebcamDeviceInfo[]>([]);
   const adminWebcamVideoRef = useRef<HTMLVideoElement | null>(null);
+  const adminWebcamStreamRef = useRef<MediaStream | null>(null);
 
   // 1. Muat Kategori & Template Kustom dari Server & LocalStorage
   useEffect(() => {
@@ -271,32 +283,58 @@ export default function AdminDashboardPage() {
     };
   }, [soundEnabled]);
 
-  // Live stream preview kamera laptop di tab Hardware admin
-  useEffect(() => {
-    let stream: MediaStream | null = null;
-    if (webcamTestActive) {
-      if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
-        navigator.mediaDevices
-          .getUserMedia({ video: { facingMode: 'user', width: 640, height: 480 } })
-          .then((s) => {
-            stream = s;
-            if (adminWebcamVideoRef.current) {
-              adminWebcamVideoRef.current.srcObject = s;
-            }
-          })
-          .catch(() => {
-            setWebcamTestActive(false);
-            showToast('Tidak dapat mengakses kamera laptop (Izin ditolak atau tidak ada webcam).');
-          });
-      }
-    }
+  // Mulai uji live feed kamera laptop di tab Hardware admin
+  const startAdminWebcamTest = async () => {
+    setIsAdminWebcamConnecting(true);
+    setAdminWebcamError(null);
+    setWebcamTestActive(true);
 
+    stopWebcamStream(adminWebcamStreamRef.current);
+    adminWebcamStreamRef.current = null;
+
+    try {
+      const result = await requestWebcamStream();
+      adminWebcamStreamRef.current = result.stream;
+      await bindStreamToVideo(adminWebcamVideoRef.current, result.stream);
+
+      const devList = await enumerateVideoDevices();
+      setWebcamDevices(devList);
+      showToast('Kamera laptop terhubung! Feed live video aktif.');
+    } catch (err: any) {
+      console.error('Koneksi kamera laptop admin gagal:', err);
+      const humanErr = getHumanWebcamError(err);
+      setAdminWebcamError(humanErr);
+      showToast('Kamera laptop: ' + humanErr);
+    } finally {
+      setIsAdminWebcamConnecting(false);
+    }
+  };
+
+  // Hentikan uji feed kamera laptop
+  const stopAdminWebcamTest = () => {
+    stopWebcamStream(adminWebcamStreamRef.current);
+    adminWebcamStreamRef.current = null;
+    setWebcamTestActive(false);
+    setAdminWebcamError(null);
+    setIsAdminWebcamConnecting(false);
+  };
+
+  // Bersihkan stream saat tab/komponen ditutup
+  useEffect(() => {
     return () => {
-      if (stream) {
-        stream.getTracks().forEach((t) => t.stop());
-      }
+      stopWebcamStream(adminWebcamStreamRef.current);
+      adminWebcamStreamRef.current = null;
     };
-  }, [webcamTestActive]);
+  }, []);
+
+  // Baca daftar perangkat video saat tab Hardware dibuka
+  useEffect(() => {
+    if (activeTab === 'hardware') {
+      enumerateVideoDevices().then((devs) => {
+        if (devs.length > 0) setWebcamDevices(devs);
+      });
+    }
+  }, [activeTab]);
 
   // Handler Ganti Sumber Kamera Aktif
   const handleSelectCamera = (source: 'canon' | 'webcam') => {
@@ -1771,18 +1809,57 @@ export default function AdminDashboardPage() {
                   <div>
                     <div className="flex items-center gap-2 text-xs font-pixel-title text-[#5CE1E6] mb-3">
                       <Laptop className="w-5 h-5 text-[#5CE1E6]" />
-                      <span className="truncate">KAMERA LAPTOP HD</span>
+                      <span className="truncate">KAMERA LAPTOP (HD WEBCAM)</span>
                     </div>
-                    <div className="p-2.5 bg-[#050C38] border-2 border-[#5CE1E6] text-[#5CE1E6] font-pixel-title text-[10px] mb-3 flex items-center gap-2">
-                      <span className="w-2 h-2 bg-[#5CE1E6] animate-pulse" />
-                      <span>STATUS: WEBRTC READY</span>
+
+                    {/* Status Badge */}
+                    <div
+                      className={`p-2.5 bg-[#050C38] border-2 text-[10px] font-pixel-title mb-3 flex items-center gap-2 ${
+                        webcamTestActive
+                          ? 'border-[#00E599] text-[#00E599]'
+                          : adminWebcamError
+                          ? 'border-[#FE0168] text-[#FE0168]'
+                          : 'border-[#5CE1E6] text-[#5CE1E6]'
+                      }`}
+                    >
+                      <span
+                        className={`w-2 h-2 ${
+                          webcamTestActive
+                            ? 'bg-[#00E599]'
+                            : adminWebcamError
+                            ? 'bg-[#FE0168]'
+                            : 'bg-[#5CE1E6]'
+                        } animate-pulse`}
+                      />
+                      <span>
+                        {webcamTestActive
+                          ? 'STATUS: LIVE STREAM AKTIF'
+                          : adminWebcamError
+                          ? 'STATUS: KENDALA KONEKSI'
+                          : 'STATUS: SIAGA (KLIK UJI FEED)'}
+                      </span>
                     </div>
-                    <ul className="text-[11px] text-white/70 space-y-1.5 mb-4">
-                      <li>&bull; Sensor: Integrated HD Camera</li>
-                      <li>&bull; Resolusi: 1280x720 (720p 30 FPS)</li>
-                      <li>&bull; Shutter: Web Canvas Snapshot</li>
-                      <li>&bull; Live Feed: Langsung di Bilik Booth</li>
+
+                    <ul className="text-[11px] text-white/70 space-y-1.5 mb-3">
+                      <li>
+                        &bull; Perangkat:{' '}
+                        <span className="text-white font-mono text-[10px]">
+                          {webcamDevices.length > 0 ? webcamDevices[0].label : 'Integrated Webcam HD'}
+                        </span>
+                      </li>
+                      <li>&bull; Format: 720p / 1080p 30 FPS RGB</li>
+                      <li>&bull; Kompatibilitas: WebRTC MediaDevices</li>
                     </ul>
+
+                    {/* Notifikasi Kendala / Izin Browser Jika Ada */}
+                    {adminWebcamError && !webcamTestActive && (
+                      <div className="p-3 bg-[#FE0168]/20 border border-[#FE0168] text-[11px] text-white/90 mb-3 font-sans leading-relaxed">
+                        <p className="font-pixel-title text-[10px] text-[#FFD84D] mb-1">
+                          ⚠️ PANDUAN MENGHUBUNGKAN:
+                        </p>
+                        {adminWebcamError}
+                      </div>
+                    )}
 
                     {/* Pratinjau Mini Live Feed Webcam Admin */}
                     {webcamTestActive && (
@@ -1794,8 +1871,9 @@ export default function AdminDashboardPage() {
                           muted
                           className="w-full h-full object-cover scale-x-[-1]"
                         />
-                        <div className="absolute top-1 left-1 bg-black/70 text-[#00E599] px-1 text-[8px] font-pixel-title">
-                          LIVE TEST
+                        <div className="absolute top-1 left-1 bg-black/80 text-[#00E599] px-1.5 py-0.5 text-[8px] font-pixel-title border border-[#00E599]/40 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 bg-[#00E599] animate-pulse" />
+                          <span>LIVE TEST OK</span>
                         </div>
                       </div>
                     )}
@@ -1815,19 +1893,44 @@ export default function AdminDashboardPage() {
                         ✓ KAMERA BOOTH AKTIF
                       </div>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setWebcamTestActive(!webcamTestActive);
-                        if (!webcamTestActive) {
-                          retroAudio.playButtonClick();
-                          showToast('Membuka live feed kamera laptop...');
-                        }
-                      }}
-                      className="w-full py-2 pixel-btn bg-[#160078] hover:bg-[#5CE1E6] hover:text-[#050C38] text-white text-[10px] font-pixel-title font-bold"
-                    >
-                      {webcamTestActive ? 'TUTUP UJI WEBCAM' : 'UJI LIVE FEED WEBCAM'}
-                    </button>
+
+                    {webcamTestActive ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            retroAudio.playShutterSound();
+                            showToast('Test shutter kamera laptop berhasil!');
+                          }}
+                          className="py-2 pixel-btn bg-[#049A5C] hover:bg-[#00E599] text-white text-[10px] font-pixel-title font-bold"
+                        >
+                          JEPRET TEST
+                        </button>
+                        <button
+                          type="button"
+                          onClick={stopAdminWebcamTest}
+                          className="py-2 pixel-btn bg-[#131947] hover:bg-[#FE0168] text-white text-[10px] font-pixel-title"
+                        >
+                          TUTUP FEED
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={isAdminWebcamConnecting}
+                        onClick={startAdminWebcamTest}
+                        className="w-full py-2 pixel-btn bg-[#160078] hover:bg-[#5CE1E6] hover:text-[#050C38] text-white text-[10px] font-pixel-title font-bold flex items-center justify-center gap-1.5"
+                      >
+                        {isAdminWebcamConnecting ? (
+                          <>
+                            <RefreshCw className="w-3 h-3 animate-spin" />
+                            <span>MENGHUBUNGKAN...</span>
+                          </>
+                        ) : (
+                          <span>UJI LIVE FEED WEBCAM</span>
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
 

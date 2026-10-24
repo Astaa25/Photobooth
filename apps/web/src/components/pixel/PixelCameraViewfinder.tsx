@@ -1,5 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, Laptop } from 'lucide-react';
+import { Camera, Laptop, RefreshCw, VideoOff, Check, AlertTriangle } from 'lucide-react';
+import {
+  requestWebcamStream,
+  bindStreamToVideo,
+  stopWebcamStream,
+  getHumanWebcamError,
+  enumerateVideoDevices,
+  type WebcamDeviceInfo,
+} from '@/utils/webcamHelper';
 
 interface PixelCameraViewfinderProps {
   countdownNum: number;
@@ -24,7 +32,13 @@ export function PixelCameraViewfinder({
 }: PixelCameraViewfinderProps) {
   const [vuLevel, setVuLevel] = useState(3);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const currentStreamRef = useRef<MediaStream | null>(null);
   const [hasWebcamStream, setHasWebcamStream] = useState(false);
+  const [webcamError, setWebcamError] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [webcamLabel, setWebcamLabel] = useState<string>('KAMERA LAPTOP HD');
+  const [devices, setDevices] = useState<WebcamDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
 
   // Efek simulasi level audio VU meter 8-bit
   useEffect(() => {
@@ -34,32 +48,60 @@ export function PixelCameraViewfinder({
     return () => clearInterval(interval);
   }, []);
 
-  // Aktifkan feed video jika sumber kamera adalah kamera laptop (webcam)
-  useEffect(() => {
-    let mediaStream: MediaStream | null = null;
-    if (cameraSource === 'webcam') {
-      if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
-        navigator.mediaDevices
-          .getUserMedia({ video: { facingMode: 'user', width: 1280, height: 720 } })
-          .then((stream) => {
-            mediaStream = stream;
-            if (videoRef.current) {
-              videoRef.current.srcObject = stream;
-              setHasWebcamStream(true);
-            }
-          })
-          .catch(() => {
-            setHasWebcamStream(false);
-          });
+  // Fungsi penghubung kamera laptop yang tangguh dengan fallback bertingkat
+  const connectWebcam = async (targetDeviceId?: string) => {
+    if (cameraSource !== 'webcam') return;
+
+    setIsConnecting(true);
+    setWebcamError(null);
+
+    // Hentikan stream sebelumnya jika ada
+    stopWebcamStream(currentStreamRef.current);
+    currentStreamRef.current = null;
+    setHasWebcamStream(false);
+
+    try {
+      const devId = targetDeviceId || selectedDeviceId || undefined;
+      const result = await requestWebcamStream(devId);
+      currentStreamRef.current = result.stream;
+
+      if (result.label) {
+        setWebcamLabel(result.label);
       }
-    } else {
+      if (result.activeDeviceId) {
+        setSelectedDeviceId(result.activeDeviceId);
+      }
+
+      await bindStreamToVideo(videoRef.current, result.stream);
+      setHasWebcamStream(true);
+      setWebcamError(null);
+
+      // Muat daftar perangkat yang terpasang setelah izin aktif
+      const devList = await enumerateVideoDevices();
+      setDevices(devList);
+    } catch (err: any) {
+      console.error('Koneksi kamera laptop gagal:', err);
       setHasWebcamStream(false);
+      setWebcamError(getHumanWebcamError(err));
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  // Aktifkan feed video saat mode webcam dipilih
+  useEffect(() => {
+    if (cameraSource === 'webcam') {
+      connectWebcam();
+    } else {
+      stopWebcamStream(currentStreamRef.current);
+      currentStreamRef.current = null;
+      setHasWebcamStream(false);
+      setWebcamError(null);
     }
 
     return () => {
-      if (mediaStream) {
-        mediaStream.getTracks().forEach((track) => track.stop());
-      }
+      stopWebcamStream(currentStreamRef.current);
+      currentStreamRef.current = null;
     };
   }, [cameraSource]);
 
@@ -87,10 +129,10 @@ export function PixelCameraViewfinder({
     }
   }, [countdownNum, cameraSource, onSnapshotCapture]);
 
-  const activeDeviceLabel = cameraSource === 'webcam' ? 'KAMERA LAPTOP (WEBCAM)' : cameraName;
+  const activeDeviceLabel = cameraSource === 'webcam' ? webcamLabel : cameraName;
 
   return (
-    <div className="relative w-full aspect-[4/3] max-w-2xl mx-auto bg-black/85 pixel-box border-4 border-[#4B57B2] flex flex-col items-center justify-center overflow-hidden select-none font-pixel">
+    <div className="relative w-full aspect-[4/3] max-w-2xl mx-auto bg-black/90 pixel-box border-4 border-[#4B57B2] flex flex-col items-center justify-center overflow-hidden select-none font-pixel">
       {/* 0. Live Video Feed dari Kamera Laptop (Jika Mode Webcam Aktif) */}
       {cameraSource === 'webcam' && (
         <video
@@ -103,6 +145,56 @@ export function PixelCameraViewfinder({
           }`}
         />
       )}
+
+      {/* 0B. State Menghubungkan Kamera Laptop */}
+      {cameraSource === 'webcam' && isConnecting && !hasWebcamStream && (
+        <div className="absolute inset-0 z-15 flex flex-col items-center justify-center bg-black/85 p-6 text-center">
+          <RefreshCw className="w-10 h-10 text-[#5CE1E6] animate-spin mb-3" />
+          <p className="font-pixel-title text-xs text-[#5CE1E6] tracking-wider mb-1">
+            MENGHUBUNGKAN KE KAMERA LAPTOP...
+          </p>
+          <p className="text-[10px] text-white/70 max-w-sm">
+            Mohon izinkan akses kamera pada jendela popup browser jika diminta.
+          </p>
+        </div>
+      )}
+
+      {/* 0C. State Error / Belum Terhubung (Instruksi Jelas & Solutif) */}
+      {cameraSource === 'webcam' && webcamError && !hasWebcamStream && (
+        <div className="absolute inset-4 z-25 flex flex-col items-center justify-center bg-[#0C1230]/95 border-2 border-[#FE0168] p-5 text-center my-auto shadow-[0_0_30px_rgba(254,1,104,0.4)]">
+          <div className="w-12 h-12 bg-[#FE0168]/20 border border-[#FE0168] text-[#FE0168] flex items-center justify-center mb-3">
+            <VideoOff className="w-6 h-6 animate-pulse" />
+          </div>
+          <h3 className="font-pixel-title text-xs sm:text-sm text-[#FFD84D] mb-2">
+            KAMERA LAPTOP BELUM TERHUBUNG
+          </h3>
+          <p className="text-[11px] text-white/85 mb-4 max-w-md leading-relaxed font-sans bg-black/50 p-2.5 border border-white/10">
+            {webcamError}
+          </p>
+
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => connectWebcam()}
+              className="px-4 py-2 pixel-btn bg-[#00E599] hover:bg-[#5CE1E6] text-[#050C38] text-[11px] font-pixel-title font-bold flex items-center gap-1.5 shadow-sm"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>COBA HUBUNGKAN LAGI</span>
+            </button>
+            {onSwitchCamera && (
+              <button
+                type="button"
+                onClick={() => onSwitchCamera('canon')}
+                className="px-4 py-2 pixel-btn bg-[#131947] hover:bg-[#160078] text-[#FFD84D] text-[11px] font-pixel-title flex items-center gap-1.5 border border-[#4B57B2]"
+              >
+                <Camera className="w-3.5 h-3.5 text-[#00E599]" />
+                <span>GANTI KE CANON 1200D</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* 1. Efek Garis Scanline CRT TV Retro */}
       <div
         className="absolute inset-0 pointer-events-none opacity-20 z-10"
@@ -114,31 +206,25 @@ export function PixelCameraViewfinder({
 
       {/* 2. Grid Komposisi Rule of Thirds (Garis Pixel Putus-Putus) */}
       <div className="absolute inset-0 pointer-events-none z-0 opacity-25">
-        {/* Garis Vertikal 1/3 dan 2/3 */}
         <div className="absolute left-1/3 top-0 bottom-0 w-[1px] border-r-2 border-dashed border-[#5CE1E6]" />
         <div className="absolute left-2/3 top-0 bottom-0 w-[1px] border-r-2 border-dashed border-[#5CE1E6]" />
-        {/* Garis Horizontal 1/3 dan 2/3 */}
         <div className="absolute top-1/3 left-0 right-0 h-[1px] border-b-2 border-dashed border-[#5CE1E6]" />
         <div className="absolute top-2/3 left-0 right-0 h-[1px] border-b-2 border-dashed border-[#5CE1E6]" />
       </div>
 
       {/* 3. Sudut Bidik Kamera (Bracket Pixel Emas #FFD84D) */}
-      {/* Kiri Atas */}
       <div className="absolute top-4 left-4 w-9 h-9 pointer-events-none z-10">
         <div className="w-9 h-2 bg-[#FFD84D]" />
         <div className="w-2 h-7 bg-[#FFD84D]" />
       </div>
-      {/* Kanan Atas */}
       <div className="absolute top-4 right-4 w-9 h-9 pointer-events-none z-10">
         <div className="w-9 h-2 bg-[#FFD84D] ml-auto" />
         <div className="w-2 h-7 bg-[#FFD84D] ml-auto" />
       </div>
-      {/* Kiri Bawah */}
       <div className="absolute bottom-4 left-4 w-9 h-9 pointer-events-none z-10">
         <div className="w-2 h-7 bg-[#FFD84D]" />
         <div className="w-9 h-2 bg-[#FFD84D]" />
       </div>
-      {/* Kanan Bawah */}
       <div className="absolute bottom-4 right-4 w-9 h-9 pointer-events-none z-10">
         <div className="w-2 h-7 bg-[#FFD84D] ml-auto" />
         <div className="w-9 h-2 bg-[#FFD84D] ml-auto" />
@@ -191,11 +277,11 @@ export function PixelCameraViewfinder({
 
           <div className="flex items-center gap-2 bg-[#0C1230]/85 px-2.5 py-1 border border-[#4B57B2]">
             {cameraSource === 'webcam' ? (
-              <Laptop className="w-3 h-3 text-[#5CE1E6]" />
+              <span className={`w-2 h-2 ${hasWebcamStream ? 'bg-[#00E599]' : 'bg-[#FE0168]'} animate-pulse`} />
             ) : (
-              <Camera className="w-3 h-3 text-[#00E599]" />
+              <span className="w-2 h-2 bg-[#00E599]" />
             )}
-            <span className={cameraSource === 'webcam' ? 'text-[#5CE1E6]' : 'text-[#00E599]'}>
+            <span className={cameraSource === 'webcam' ? 'text-[#5CE1E6] truncate max-w-[120px]' : 'text-[#00E599]'}>
               {activeDeviceLabel}
             </span>
             <span className="text-white/80">[■■■■]</span>
@@ -216,7 +302,11 @@ export function PixelCameraViewfinder({
       {/* 7. Baris Status Bawah: ISO, Shutter, & Audio Meter */}
       <div className="absolute bottom-4 left-6 right-6 flex items-center justify-between text-[10px] font-pixel-title text-[#A9B8FF] z-10 pointer-events-none">
         <div className="bg-[#0C1230]/85 px-2.5 py-1 border border-[#4B57B2]">
-          {cameraSource === 'webcam' ? 'WEBCAM HD • 30 FPS • AUTO EXPOSURE' : 'ISO 400 • F/2.8 • 1/125s'}
+          {cameraSource === 'webcam'
+            ? hasWebcamStream
+              ? 'WEBCAM HD • 30 FPS • CONNECTED'
+              : 'WEBCAM: MENUNGGU KONEKSI'
+            : 'ISO 400 • F/2.8 • 1/125s'}
         </div>
 
         {/* Bar VU Meter 8-Bit */}
@@ -245,3 +335,4 @@ export function PixelCameraViewfinder({
     </div>
   );
 }
+

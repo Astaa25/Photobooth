@@ -15,8 +15,14 @@ import {
   VolumeX,
   Hourglass,
   Radio,
+  AlertTriangle,
 } from 'lucide-react';
 import { retroAudio } from '@/utils/audio';
+import {
+  requestWebcamStream,
+  stopWebcamStream,
+  getHumanWebcamError,
+} from '@/utils/webcamHelper';
 import {
   PixelStreetLamp,
   PixelBench,
@@ -102,6 +108,8 @@ export default function BoothKioskPage() {
   const [capturedPhotos, setCapturedPhotos] = useState<string[]>([]);
   const [isFlashActive, setIsFlashActive] = useState(false);
   const [cameraSource, setCameraSource] = useState<'canon' | 'webcam'>('canon');
+  const [webcamStatus, setWebcamStatus] = useState<'idle' | 'connected' | 'error'>('idle');
+  const [webcamErrorMsg, setWebcamErrorMsg] = useState<string | null>(null);
   const latestWebcamSnapshotRef = useRef<string | null>(null);
 
   // Periksa apakah tablet sudah diaktifkan di sesi browser ini
@@ -119,6 +127,30 @@ export default function BoothKioskPage() {
       } catch {}
     }
   }, []);
+
+  // Uji koneksi webcam laptop di latar belakang agar siap sebelum sesi dimulai
+  useEffect(() => {
+    let testStream: MediaStream | null = null;
+    if (cameraSource === 'webcam') {
+      requestWebcamStream()
+        .then((res) => {
+          testStream = res.stream;
+          setWebcamStatus('connected');
+          setWebcamErrorMsg(null);
+        })
+        .catch((err) => {
+          setWebcamStatus('error');
+          setWebcamErrorMsg(getHumanWebcamError(err));
+        });
+    } else {
+      setWebcamStatus('idle');
+      setWebcamErrorMsg(null);
+    }
+
+    return () => {
+      stopWebcamStream(testStream);
+    };
+  }, [cameraSource]);
 
   // Ganti sumber kamera dan broadcast ke jendela admin
   const handleSwitchCamera = (source: 'canon' | 'webcam') => {
@@ -272,6 +304,11 @@ export default function BoothKioskPage() {
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (step === 'countdown') {
+      // Jika kamera laptop sedang mengalami kendala izin/koneksi, tahan countdown agar user bisa klik Izinkan
+      if (cameraSource === 'webcam' && webcamStatus === 'error') {
+        return;
+      }
+
       if (countdownNum > 0) {
         if (soundEnabled) retroAudio.playCountdownBeep(countdownNum === 1);
         timer = setTimeout(() => setCountdownNum(countdownNum - 1), 1000);
@@ -334,7 +371,7 @@ export default function BoothKioskPage() {
       }
     }
     return () => clearTimeout(timer);
-  }, [step, countdownNum, currentPhotoIdx, capturedPhotos, selectedTemplate.photoCount, soundEnabled, retakeIndex, cameraSource]);
+  }, [step, countdownNum, currentPhotoIdx, capturedPhotos, selectedTemplate.photoCount, soundEnabled, retakeIndex, cameraSource, webcamStatus]);
 
   const startCapture = () => {
     if (soundEnabled) retroAudio.playButtonClick();
@@ -610,13 +647,26 @@ export default function BoothKioskPage() {
               if (soundEnabled) retroAudio.playButtonClick();
               handleSwitchCamera(cameraSource === 'canon' ? 'webcam' : 'canon');
             }}
-            className="flex items-center gap-1.5 px-2.5 py-1 bg-[#131947] hover:bg-[#160078] border-2 border-[#4B57B2] text-[11px] font-pixel-title transition-colors"
+            className={`flex items-center gap-1.5 px-2.5 py-1 bg-[#131947] hover:bg-[#160078] border-2 text-[11px] font-pixel-title transition-colors ${
+              cameraSource === 'webcam' && webcamStatus === 'error'
+                ? 'border-[#FE0168] text-[#FE0168]'
+                : cameraSource === 'webcam' && webcamStatus === 'connected'
+                ? 'border-[#00E599] text-[#00E599]'
+                : 'border-[#4B57B2] text-[#5CE1E6]'
+            }`}
             title="Ganti Sumber Kamera (Canon DSLR vs Laptop Webcam)"
           >
             {cameraSource === 'webcam' ? (
               <>
-                <Laptop className="w-3.5 h-3.5 text-[#5CE1E6]" />
-                <span className="text-[#5CE1E6]">KAMERA: LAPTOP</span>
+                <Laptop className="w-3.5 h-3.5" />
+                <span>
+                  KAMERA: LAPTOP{' '}
+                  {webcamStatus === 'connected'
+                    ? '(OK)'
+                    : webcamStatus === 'error'
+                    ? '(KENDALA)'
+                    : ''}
+                </span>
               </>
             ) : (
               <>
@@ -770,6 +820,39 @@ export default function BoothKioskPage() {
               ))}
             </div>
 
+            {/* Banner Peringatan Akses Kamera Laptop Jika Ditolak/Belum Aktif */}
+            {cameraSource === 'webcam' && webcamStatus === 'error' && (
+              <div className="w-full max-w-xl mx-auto mb-4 p-3.5 bg-[#FE0168]/20 border-2 border-[#FE0168] text-white text-xs font-pixel-title flex flex-col sm:flex-row items-center justify-between gap-3 text-left">
+                <div className="flex items-start gap-2.5">
+                  <AlertTriangle className="w-4 h-4 text-[#FFD84D] shrink-0 mt-0.5" />
+                  <div>
+                    <span className="text-[#FFD84D] block font-bold mb-0.5">KAMERA LAPTOP BUTUH AKSES:</span>
+                    <span className="text-[11px] font-normal font-sans text-white/90 leading-tight block">
+                      {webcamErrorMsg || 'Klik ikon gembok di sebelah kiri localhost:3000 -> Izinkan Kamera.'}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    requestWebcamStream()
+                      .then((res) => {
+                        stopWebcamStream(res.stream);
+                        setWebcamStatus('connected');
+                        setWebcamErrorMsg(null);
+                      })
+                      .catch((err) => {
+                        setWebcamStatus('error');
+                        setWebcamErrorMsg(getHumanWebcamError(err));
+                      });
+                  }}
+                  className="px-3 py-1.5 bg-[#00E599] hover:bg-[#5CE1E6] text-[#050C38] text-[10px] font-pixel-title shrink-0 font-bold"
+                >
+                  HUBUNGKAN
+                </button>
+              </div>
+            )}
+
             <button
               onClick={startCapture}
               className="h-14 px-8 pixel-btn bg-[#049A5C] hover:bg-[#00E599] text-white text-xs font-bold flex items-center justify-center gap-2 mx-auto"
@@ -777,6 +860,23 @@ export default function BoothKioskPage() {
               <Camera className="w-4 h-4" />
               <span>MULAI SESI FOTO ({selectedTemplate.photoCount}X JEPRET)</span>
             </button>
+
+            {/* Indikator Sumber Kamera Aktif */}
+            <div className="mt-3 flex items-center justify-center gap-2 text-[10px] text-[#A9B8FF] font-pixel-title">
+              <span>SUMBER KAMERA:</span>
+              <span className={cameraSource === 'webcam' ? 'text-[#5CE1E6]' : 'text-[#00E599]'}>
+                {cameraSource === 'webcam'
+                  ? `KAMERA LAPTOP ${webcamStatus === 'connected' ? '● SIAP' : webcamStatus === 'error' ? '● BUTUH IZIN' : '● MEMERIKSA'}`
+                  : 'CANON EOS 1200D DSLR ● SIAP'}
+              </span>
+              <button
+                type="button"
+                onClick={() => handleSwitchCamera(cameraSource === 'canon' ? 'webcam' : 'canon')}
+                className="underline text-[#FFD84D] hover:text-white ml-1"
+              >
+                (GANTI)
+              </button>
+            </div>
           </div>
         )}
 
