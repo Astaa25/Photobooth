@@ -1258,10 +1258,10 @@ export default function AdminDashboardPage() {
                   <button
                     type="button"
                     onClick={handleOpenAddTemplate}
-                    className="px-5 py-2.5 pixel-btn bg-[#FFD84D] hover:bg-[#FFE57F] text-[#050C38] text-xs font-pixel-title font-bold flex items-center justify-center gap-2 shadow-[4px_4px_0_0_#A07800] active:scale-95 shrink-0"
+                    className="px-5 py-2.5 pixel-btn bg-[#FFD84D] hover:bg-[#FFE57F] text-[#050C38] text-xs font-pixel-title font-bold flex items-center justify-center gap-2 border-2 border-black shadow-[3px_3px_0_0_#000] active:scale-95 shrink-0"
                   >
                     <Plus className="w-4 h-4 stroke-[3]" />
-                    <span>+ TAMBAH TEMPLATE (GAMBAR 1)</span>
+                    <span>TAMBAH TEMPLATE</span>
                   </button>
                 </div>
 

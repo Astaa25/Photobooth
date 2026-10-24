@@ -87,8 +87,15 @@ body {
 
 .font-pixel-title {
   font-family: var(--font-pixel-display), ui-monospace, monospace;
-  text-shadow: 2px 2px 0 #050C38, 4px 4px 0 #010030;
   letter-spacing: 1px;
+}
+
+.pixel-title-shadow {
+  text-shadow: 2px 2px 0 #050C38, 4px 4px 0 #010030;
+}
+
+button, .pixel-btn, input, textarea, select {
+  text-shadow: none !important;
 }
 
 .font-pixel {

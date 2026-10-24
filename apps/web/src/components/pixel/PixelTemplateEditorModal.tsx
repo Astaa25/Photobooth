@@ -615,20 +615,20 @@ export function PixelTemplateEditorModal({
             <button
               type="submit"
               disabled={isSubmitting || !validationResult.valid}
-              className={`px-6 py-2.5 pixel-btn font-pixel-title text-xs font-bold transition-all ${
+              className={`px-6 py-2.5 pixel-btn font-pixel-title text-xs font-bold transition-all border-2 border-black ${
                 validationResult.valid && !isSubmitting
-                  ? 'bg-[#FFD84D] hover:bg-[#FFE57F] text-[#050C38] shadow-[4px_4px_0_0_#A07800]'
-                  : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                  ? 'bg-[#FFD84D] hover:bg-[#FFE57F] text-[#050C38] shadow-[3px_3px_0_0_#000] active:scale-95'
+                  : 'bg-gray-600 text-gray-400 cursor-not-allowed border-gray-700'
               }`}
             >
-              {isSubmitting ? 'MENYIMPAN...' : 'SIMPAN PERUBAHAN'}
+              {isSubmitting ? 'MENYIMPAN...' : template ? 'SIMPAN PERUBAHAN' : 'SIMPAN TEMPLATE'}
             </button>
 
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-5 py-2.5 pixel-btn bg-[#1E2768] hover:bg-[#35408E] text-white font-pixel-title text-xs border border-white/20"
+              className="px-5 py-2.5 pixel-btn bg-[#171B3E] hover:bg-[#252B62] text-[#A9B8FF] font-pixel-title text-xs border border-[#3B4588] active:scale-95"
             >
               Batal
             </button>

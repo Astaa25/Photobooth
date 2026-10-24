@@ -98,7 +98,8 @@ const TEMPLATES: TemplateOption[] = [
 ];
 
 export default function BoothKioskPage() {
-  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [isUnlocked, setIsUnlocked] = useState(true);
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -128,10 +129,11 @@ export default function BoothKioskPage() {
 
   // Periksa apakah tablet sudah diaktifkan di sesi browser ini
   useEffect(() => {
+    setMounted(true);
     if (typeof window !== 'undefined') {
       const saved = sessionStorage.getItem('booth_kiosk_unlocked');
-      if (saved === 'true') {
-        setIsUnlocked(true);
+      if (saved === 'false') {
+        setIsUnlocked(false);
       }
       try {
         const savedCam = localStorage.getItem('photobooth_selected_camera');
@@ -578,12 +580,24 @@ export default function BoothKioskPage() {
     }
   };
 
+  // Cegah hydration mismatch sebelum client ter-mount
+  if (!mounted) {
+    return (
+      <div className="w-screen h-screen bg-[#050C38] flex items-center justify-center text-white font-pixel" suppressHydrationWarning>
+        <div className="flex items-center gap-2 text-xs text-[#FFD84D]">
+          <span className="w-2.5 h-2.5 bg-[#00E599] animate-pulse" />
+          <span>MEMUAT BILIK PHOTOBOOTH...</span>
+        </div>
+      </div>
+    );
+  }
+
   // =========================================================================
   // 1. TAMPILAN TERKUNCI (Jika Dibuka Tanpa PIN Operator)
   // =========================================================================
   if (!isUnlocked) {
     return (
-      <div className="w-screen h-screen bg-[#050C38] text-white flex flex-col items-center justify-center p-6 relative select-none overflow-hidden font-pixel">
+      <div className="w-screen h-screen bg-[#050C38] text-white flex flex-col items-center justify-center p-6 relative select-none overflow-hidden font-pixel" suppressHydrationWarning>
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#160078] via-[#050C38] to-[#010030] pointer-events-none" />
         <div className="absolute inset-0 bg-[url('/assets/pixel/stars-a.png')] bg-repeat pixel-art opacity-50 animate-twinkle pointer-events-none" />
         <div className="absolute bottom-0 left-0 right-0 h-48 bg-[url('/assets/pixel/city-night.png')] bg-repeat-x bg-bottom pixel-art opacity-30 pointer-events-none" />
@@ -595,7 +609,7 @@ export default function BoothKioskPage() {
           <PixelVendingMachine height={100} />
         </div>
 
-        <div className="w-full max-w-sm bg-[#0C1230]/90 pixel-box p-8 text-center relative z-10 backdrop-blur">
+        <div className="w-full max-w-sm bg-[#0C1230]/90 pixel-box p-8 text-center relative z-10 backdrop-blur" suppressHydrationWarning>
           <div className="w-14 h-14 pixel-box-cyber bg-[#E02F75] text-white flex items-center justify-center mx-auto mb-4">
             <Lock className="w-7 h-7 text-white" />
           </div>
@@ -607,8 +621,8 @@ export default function BoothKioskPage() {
             Layar ini khusus untuk tablet di bilik foto. Masukkan PIN operator untuk mengaktifkan mode aplikasi booth.
           </p>
 
-          <form onSubmit={handleUnlock} className="space-y-4">
-            <div className="relative">
+          <form onSubmit={handleUnlock} className="space-y-4" suppressHydrationWarning autoComplete="off">
+            <div className="relative" suppressHydrationWarning>
               <input
                 type="password"
                 maxLength={6}
@@ -618,6 +632,10 @@ export default function BoothKioskPage() {
                   setPinError(false);
                 }}
                 placeholder="PIN OPERATOR"
+                autoComplete="new-password"
+                data-1p-ignore="true"
+                data-lpignore="true"
+                suppressHydrationWarning
                 className="w-full h-12 text-center text-base tracking-widest font-pixel-title border-4 border-[#4B57B2] bg-[#010030] text-[#FFD84D] focus:outline-none focus:border-[#E02F75] transition-all"
               />
               <KeyRound className="w-4 h-4 text-white/40 absolute left-3 top-4 pointer-events-none" />
@@ -631,6 +649,7 @@ export default function BoothKioskPage() {
 
             <button
               type="submit"
+              suppressHydrationWarning
               className="w-full h-12 pixel-btn bg-[#E02F75] text-white text-xs font-bold hover:bg-[#FF5A57]"
             >
               BUKA APLIKASI BOOTH
