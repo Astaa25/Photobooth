@@ -306,12 +306,15 @@ export default function AdminDashboardPage() {
       const result = await scanFrameTransparency(targetSource, ratio);
       setDetectedSlots(result.slots);
       setScanMessage(result.message);
-      if (result.detectedCount > 0) {
-        setFrameCount(result.detectedCount);
+      if (result.poseCount > 0) {
+        setFrameCount(result.poseCount);
+      }
+      if (result.isDualStrip) {
+        setFrameLayout('strip');
       }
       showToast(result.message);
     } catch {
-      const fallback = getFallbackPreset(frameCount, ratio, false, 'Menggunakan tata letak preset.');
+      const fallback = getFallbackPreset(frameCount, ratio, frameLayout, false, 'Menggunakan tata letak preset.');
       setDetectedSlots(fallback.slots);
       setScanMessage(fallback.message);
     } finally {
@@ -319,13 +322,28 @@ export default function AdminDashboardPage() {
     }
   };
 
+  // Auto-muat template strip bawaan saat tab frames pertama kali dibuka
+  useEffect(() => {
+    if (activeTab === 'frames' && !uploadedFramePreview && templates.length > 0) {
+      const defaultTpl = templates[0];
+      setFrameName(defaultTpl.name);
+      setFrameDesc(defaultTpl.desc);
+      setFrameLayout(defaultTpl.previewType);
+      setFrameCount(defaultTpl.photoCount);
+      if (defaultTpl.frameImage) {
+        setUploadedFramePreview(defaultTpl.frameImage);
+        runFrameScan(defaultTpl.frameImage, photoRatio);
+      }
+    }
+  }, [activeTab]);
+
   // Ganti Rasio Landscape (4:3 / 16:9 / 3:2)
   const handleRatioChange = (newRatio: '4:3' | '16:9' | '3:2') => {
     setPhotoRatio(newRatio);
     if (uploadedFramePreview) {
       runFrameScan(uploadedFramePreview, newRatio);
     } else {
-      const preset = getFallbackPreset(frameCount, newRatio, false);
+      const preset = getFallbackPreset(frameCount, newRatio, frameLayout, false);
       setDetectedSlots(preset.slots);
       setScanMessage(preset.message);
     }
@@ -335,7 +353,7 @@ export default function AdminDashboardPage() {
   const handleFrameCountSelect = (count: number) => {
     setFrameCount(count);
     if (!uploadedFramePreview) {
-      const preset = getFallbackPreset(count, photoRatio, false);
+      const preset = getFallbackPreset(count, photoRatio, frameLayout, false);
       setDetectedSlots(preset.slots);
       setScanMessage(preset.message);
     }
@@ -1246,29 +1264,31 @@ export default function AdminDashboardPage() {
                             <div className="absolute inset-0 pointer-events-none">
                               {(detectedSlots.length > 0
                                 ? detectedSlots
-                                : getFallbackPreset(frameCount, photoRatio).slots
-                              ).map((slot, sIdx) => (
-                                <div
-                                  key={slot.id}
-                                  className="absolute border border-black/40 overflow-hidden flex flex-col items-center justify-center transition-all shadow-inner"
-                                  style={{
-                                    left: `${slot.xPercent}%`,
-                                    top: `${slot.yPercent}%`,
-                                    width: `${slot.widthPercent}%`,
-                                    height: `${slot.heightPercent}%`,
-                                    backgroundColor: ['#1D4ED8', '#BE185D', '#047857', '#B45309', '#7C3AED', '#C2410C'][
-                                      sIdx % 6
-                                    ],
-                                  }}
-                                >
-                                  <span className="font-pixel-title text-[8px] text-white bg-black/60 px-1 border border-white/20">
-                                    FOTO #{slot.id}
-                                  </span>
-                                  <span className="text-[6px] text-white/80 font-pixel">
-                                    {photoRatio} LANDSCAPE
-                                  </span>
-                                </div>
-                              ))}
+                                : getFallbackPreset(frameCount, photoRatio, frameLayout).slots
+                              ).map((slot) => {
+                                const poseIdx = (slot.poseId || slot.id) - 1;
+                                const palette = ['#1D4ED8', '#BE185D', '#047857', '#B45309', '#7C3AED', '#C2410C'];
+                                return (
+                                  <div
+                                    key={slot.id}
+                                    className="absolute border border-black/40 overflow-hidden flex flex-col items-center justify-center transition-all shadow-inner"
+                                    style={{
+                                      left: `${slot.xPercent}%`,
+                                      top: `${slot.yPercent}%`,
+                                      width: `${slot.widthPercent}%`,
+                                      height: `${slot.heightPercent}%`,
+                                      backgroundColor: palette[poseIdx % palette.length],
+                                    }}
+                                  >
+                                    <span className="font-pixel-title text-[7px] text-white bg-black/60 px-1 border border-white/20 whitespace-nowrap">
+                                      {slot.label || `POSE #${slot.poseId || slot.id}`}
+                                    </span>
+                                    <span className="text-[6px] text-white/80 font-pixel">
+                                      {photoRatio} LANDSCAPE
+                                    </span>
+                                  </div>
+                                );
+                              })}
                             </div>
                           )}
 
@@ -1295,7 +1315,7 @@ export default function AdminDashboardPage() {
                             <div className="absolute inset-0 pointer-events-none z-20">
                               {(detectedSlots.length > 0
                                 ? detectedSlots
-                                : getFallbackPreset(frameCount, photoRatio).slots
+                                : getFallbackPreset(frameCount, photoRatio, frameLayout).slots
                               ).map((slot) => (
                                 <div
                                   key={`cross-${slot.id}`}
@@ -1308,7 +1328,7 @@ export default function AdminDashboardPage() {
                                   }}
                                 >
                                   <span className="absolute -top-3.5 left-0 text-[6px] font-pixel-title bg-[#0C1230] text-[#5CE1E6] px-1 border border-[#5CE1E6]/50 whitespace-nowrap">
-                                    SLOT #{slot.id} ({slot.aspectRatio})
+                                    {slot.label || `SLOT #${slot.id}`} ({slot.aspectRatio})
                                   </span>
                                 </div>
                               ))}
@@ -1514,7 +1534,26 @@ export default function AdminDashboardPage() {
                         <p className="text-[10px] text-white/60 mb-2 leading-snug">{tpl.desc}</p>
                       </div>
 
-                      <div className="flex items-center justify-between pt-2 border-t border-[#4B57B2]/40 text-[9px] font-pixel-title">
+                      <div className="flex items-center justify-between pt-2 border-t border-[#4B57B2]/40 text-[9px] font-pixel-title gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUploadedFramePreview(tpl.frameImage || null);
+                            setFrameName(tpl.name);
+                            setFrameDesc(tpl.desc);
+                            setFrameLayout(tpl.previewType);
+                            setFrameCount(tpl.photoCount);
+                            if (tpl.frameImage) {
+                              runFrameScan(tpl.frameImage, photoRatio);
+                            }
+                            showToast(`Template "${tpl.name}" dimuat ke simulator pemindai!`);
+                          }}
+                          className="px-2 py-1 pixel-btn bg-[#6700A3] hover:bg-[#E02F75] text-white flex items-center gap-1 shadow-sm"
+                          title="Tampilkan & Pindai di Simulator"
+                        >
+                          <Scan className="w-3 h-3" />
+                          <span>UJI PINDAI</span>
+                        </button>
                         <span className="text-[#00E599]">{tpl.photoCount} FOTO &bull; 4R</span>
                         {tpl.isCustom && (
                           <button
@@ -1610,9 +1649,9 @@ export default function AdminDashboardPage() {
           3. NOTIFIKASI TOAST FLOATING (POJOK KANAN BAWAH, TIDAK MENUTUPI HEADER / SIDEBAR)
           ===================================================================== */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 max-w-sm px-4 py-2.5 pixel-box bg-[#0C1230]/95 border-2 border-[#5CE1E6] text-white text-xs font-pixel-title flex items-center gap-3 shadow-[0_0_20px_rgba(5,12,56,0.95)] animate-fadeIn">
+        <div className="fixed bottom-14 right-6 z-50 max-w-sm px-4 py-3 pixel-box bg-[#0C1230] border-2 border-[#5CE1E6] text-white text-xs font-pixel-title flex items-center gap-3 shadow-[0_0_25px_rgba(5,12,56,0.95)] animate-fadeIn">
           <Sparkles className="w-4 h-4 text-[#FFD84D] shrink-0" />
-          <span className="flex-1 text-[11px] leading-tight text-[#5CE1E6]">{toastMessage}</span>
+          <span className="flex-1 text-[11px] leading-snug text-white font-normal">{toastMessage}</span>
           <button
             onClick={() => {
               if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);

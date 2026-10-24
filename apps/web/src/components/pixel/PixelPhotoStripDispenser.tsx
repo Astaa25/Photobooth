@@ -70,59 +70,129 @@ export function PixelPhotoStripDispenser({
 
           {/* Kertas Foto Strip 4R yang Meluncur Keluar */}
           <div
-            className={`w-64 bg-gradient-to-b from-[#0C1230] to-[#160078] border-4 border-[#E02F75] p-3 shadow-[6px_6px_0_0_rgba(5,12,56,0.8)] transition-all duration-1000 ease-out -mt-1 relative z-10 overflow-hidden ${
+            className={`w-64 bg-gradient-to-b from-[#0C1230] to-[#160078] border-4 border-[#E02F75] p-2.5 shadow-[6px_6px_0_0_rgba(5,12,56,0.8)] transition-all duration-1000 ease-out -mt-1 relative z-10 overflow-hidden ${
               dispensed ? 'translate-y-0 opacity-100' : '-translate-y-12 opacity-30'
             }`}
           >
-
-            {/* Header Strip Foto */}
-            <div className="text-center pb-2 mb-2 border-b-2 border-dashed border-[#5CE1E6]/40 relative z-10">
-              <div className="flex items-center justify-center gap-1 text-[#FFD84D] mb-0.5">
-                <PixelCrossStar size={8} />
-                <span className="font-pixel-title text-[8px] tracking-wider">
-                  EXPO WISUDA TIK 2026
-                </span>
-                <PixelCrossStar size={8} />
-              </div>
-              <p className="text-[9px] text-white/80 font-pixel-title">
-                POLITEKNIK NEGERI LHOKSEUMAWE
-              </p>
-            </div>
-
-            {/* Bingkai Foto Pengunjung (Tersusun Vertikal) */}
-            <div className="space-y-1.5 relative z-10">
-              {photos.map((photoColor, idx) => (
-                <div
-                  key={idx}
-                  className="relative w-full aspect-[16/10] border-2 border-white/20 bg-black/60 overflow-hidden flex items-center justify-center"
-                >
-                  <div
-                    className="w-full h-full flex flex-col items-center justify-center p-1"
-                    style={{ backgroundColor: photoColor }}
-                  >
-                    <div className="bg-black/60 px-2 py-0.5 font-pixel-title text-[9px] text-white border border-white/30">
-                      POSE #{idx + 1}
+            {frameImage ? (
+              /* Lembar 4R Berbingkai Asli (Frame Image Transparan Overlay di atas Foto Pengunjung) */
+              <div className="relative w-full aspect-[2/3] overflow-hidden bg-black/80 border border-white/20">
+                {/* Layer Foto Belakang: Foto Pengunjung Tersusun Landscape (Dual Strip 2-Kolom atau Vertikal) */}
+                <div className="absolute inset-0 pointer-events-none p-1">
+                  {photos.length === 4 ? (
+                    /* Format Dual Strip: 2 Kolom x 4 Baris (Strip Ganda Photobooth) */
+                    <div className="grid grid-cols-2 gap-1.5 h-full py-5 px-1.5">
+                      {/* Kolom Kiri */}
+                      <div className="flex flex-col justify-between gap-1 h-full">
+                        {photos.map((color, idx) => (
+                          <div
+                            key={`left-${idx}`}
+                            style={{ backgroundColor: color }}
+                            className="flex-1 aspect-[16/10] border border-black/40 flex items-center justify-center shadow-inner"
+                          >
+                            <span className="font-pixel-title text-[7px] text-white bg-black/60 px-1 border border-white/20">
+                              POSE #{idx + 1}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      {/* Kolom Kanan (Strip Kembar) */}
+                      <div className="flex flex-col justify-between gap-1 h-full">
+                        {photos.map((color, idx) => (
+                          <div
+                            key={`right-${idx}`}
+                            style={{ backgroundColor: color }}
+                            className="flex-1 aspect-[16/10] border border-black/40 flex items-center justify-center shadow-inner"
+                          >
+                            <span className="font-pixel-title text-[7px] text-white bg-black/60 px-1 border border-white/20">
+                              POSE #{idx + 1}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="absolute bottom-0.5 right-1 text-[7px] font-pixel-title text-white/90 bg-black/70 px-1">
-                    TIK2026
-                  </div>
+                  ) : (
+                    /* Format Strip Vertikal Bertingkat */
+                    <div className="flex flex-col justify-between h-full py-4 px-2 gap-1.5">
+                      {photos.map((color, idx) => (
+                        <div
+                          key={idx}
+                          style={{ backgroundColor: color }}
+                          className="flex-1 border border-black/40 flex items-center justify-center shadow-inner"
+                        >
+                          <span className="font-pixel-title text-[8px] text-white bg-black/60 px-1.5 border border-white/20">
+                            POSE #{idx + 1}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              ))}
-            </div>
 
-            {/* Footer Strip Foto: Info Pengunjung, Tanggal */}
-            <div className="mt-2 pt-2 border-t-2 border-dashed border-[#5CE1E6]/40 flex items-center justify-between text-[8px] font-pixel-title relative z-10">
-              <div className="text-left">
-                <span className="text-[#FFD84D] block">{visitorName}</span>
-                <span className="text-[#5CE1E6] block">{ticketNumber}</span>
-                <span className="text-white/50 text-[7px] block">24 OKT 2026</span>
+                {/* Layer Bingkai Frame Asli PNG Transparan */}
+                <img
+                  src={frameImage}
+                  alt={templateName}
+                  className="absolute inset-0 w-full h-full object-fill pixel-art pointer-events-none z-10"
+                />
+
+                <span className="absolute bottom-1 right-1.5 z-20 text-[7px] font-pixel-title text-[#FFD84D] bg-black/70 px-1 border border-[#FFD84D]/30">
+                  {visitorName} ({ticketNumber})
+                </span>
               </div>
-              <span className="text-[7px] text-white/60 bg-black/40 px-1 py-0.5 border border-white/20">
-                {templateName}
-              </span>
-            </div>
+            ) : (
+              /* Fallback Tanpa Frame Image */
+              <>
+                {/* Header Strip Foto */}
+                <div className="text-center pb-2 mb-2 border-b-2 border-dashed border-[#5CE1E6]/40 relative z-10">
+                  <div className="flex items-center justify-center gap-1 text-[#FFD84D] mb-0.5">
+                    <PixelCrossStar size={8} />
+                    <span className="font-pixel-title text-[8px] tracking-wider">
+                      EXPO WISUDA TIK 2026
+                    </span>
+                    <PixelCrossStar size={8} />
+                  </div>
+                  <p className="text-[9px] text-white/80 font-pixel-title">
+                    POLITEKNIK NEGERI LHOKSEUMAWE
+                  </p>
+                </div>
+
+                {/* Bingkai Foto Pengunjung (Tersusun Vertikal) */}
+                <div className="space-y-1.5 relative z-10">
+                  {photos.map((photoColor, idx) => (
+                    <div
+                      key={idx}
+                      className="relative w-full aspect-[16/10] border-2 border-white/20 bg-black/60 overflow-hidden flex items-center justify-center"
+                    >
+                      <div
+                        className="w-full h-full flex flex-col items-center justify-center p-1"
+                        style={{ backgroundColor: photoColor }}
+                      >
+                        <div className="bg-black/60 px-2 py-0.5 font-pixel-title text-[9px] text-white border border-white/30">
+                          POSE #{idx + 1}
+                        </div>
+                      </div>
+
+                      <div className="absolute bottom-0.5 right-1 text-[7px] font-pixel-title text-white/90 bg-black/70 px-1">
+                        TIK2026
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Footer Strip Foto: Info Pengunjung, Tanggal */}
+                <div className="mt-2 pt-2 border-t-2 border-dashed border-[#5CE1E6]/40 flex items-center justify-between text-[8px] font-pixel-title relative z-10">
+                  <div className="text-left">
+                    <span className="text-[#FFD84D] block">{visitorName}</span>
+                    <span className="text-[#5CE1E6] block">{ticketNumber}</span>
+                    <span className="text-white/50 text-[7px] block">24 OKT 2026</span>
+                  </div>
+                  <span className="text-[7px] text-white/60 bg-black/40 px-1 py-0.5 border border-white/20">
+                    {templateName}
+                  </span>
+                </div>
+              </>
+            )}
           </div>
         </div>
 

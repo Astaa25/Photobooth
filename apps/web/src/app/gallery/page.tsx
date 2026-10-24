@@ -258,11 +258,11 @@ export default function GalleryPage() {
           </div>
         </header>
 
-        {/* Toast Notifikasi Unduh */}
+        {/* Floating Toast Notifikasi Unduh (Tidak Merusak / Menggeser Grid Galeri) */}
         {singleDownloadSuccess && (
-          <div className="mb-6 p-3 pixel-box bg-[#0C1230] border-2 border-[#00E599] text-[#00E599] text-xs font-pixel-title flex items-center gap-2 shadow-[0_0_12px_rgba(0,229,153,0.4)] animate-fadeIn">
-            <CheckCircle className="w-4 h-4 shrink-0" />
-            <span>Berhasil mengunduh: {singleDownloadSuccess}!</span>
+          <div className="fixed bottom-8 right-8 z-50 max-w-sm px-4 py-3 pixel-box bg-[#0C1230]/95 border-2 border-[#00E599] text-white text-xs font-pixel-title flex items-center gap-3 shadow-[0_0_20px_rgba(0,229,153,0.4)] animate-fadeIn">
+            <CheckCircle className="w-4 h-4 text-[#00E599] shrink-0" />
+            <span className="leading-snug">Berhasil mengunduh <span className="text-[#00E599]">{singleDownloadSuccess}</span>!</span>
           </div>
         )}
 

@@ -95,7 +95,7 @@ export default function BoothKioskPage() {
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateOption>(TEMPLATES[0]);
   const [visitorName, setVisitorName] = useState('');
   const [ticketNumber, setTicketNumber] = useState('');
-  const [countdownNum, setCountdownNum] = useState(3);
+  const [countdownNum, setCountdownNum] = useState(5);
   const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
   const [retakeIndex, setRetakeIndex] = useState<number | null>(null);
   const [capturedPhotos, setCapturedPhotos] = useState<string[]>([]);
@@ -283,7 +283,7 @@ export default function BoothKioskPage() {
 
           if (currentPhotoIdx + 1 < selectedTemplate.photoCount) {
             setCurrentPhotoIdx(currentPhotoIdx + 1);
-            setCountdownNum(3);
+            setCountdownNum(5);
             setStep('countdown');
           } else {
             setStep('review');
@@ -300,7 +300,7 @@ export default function BoothKioskPage() {
     setRetakeIndex(null);
     setCapturedPhotos([]);
     setCurrentPhotoIdx(0);
-    setCountdownNum(3);
+    setCountdownNum(5);
     setStep('countdown');
   };
 
@@ -308,7 +308,7 @@ export default function BoothKioskPage() {
     if (soundEnabled) retroAudio.playButtonClick();
     setRetakeIndex(idx);
     setCurrentPhotoIdx(idx);
-    setCountdownNum(3);
+    setCountdownNum(5);
     setStep('countdown');
   };
 
