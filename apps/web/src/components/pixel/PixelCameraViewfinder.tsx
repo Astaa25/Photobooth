@@ -6,6 +6,7 @@ interface PixelCameraViewfinderProps {
   countdownNum: number;
   currentPhotoIdx: number;
   totalPhotos: number;
+  isRetake?: boolean;
   cameraName?: string;
 }
 
@@ -13,6 +14,7 @@ export function PixelCameraViewfinder({
   countdownNum,
   currentPhotoIdx,
   totalPhotos,
+  isRetake = false,
   cameraName = 'CANON EOS 1200D',
 }: PixelCameraViewfinderProps) {
   const [vuLevel, setVuLevel] = useState(3);
@@ -87,7 +89,7 @@ export function PixelCameraViewfinder({
 
         {/* Info Index Jepret */}
         <div className="bg-[#131947] px-3 py-1 border-2 border-[#E02F75] text-[#FFD84D]">
-          FOTO {currentPhotoIdx + 1}/{totalPhotos}
+          {isRetake ? `ULANGI FOTO #${currentPhotoIdx + 1} (1X)` : `FOTO ${currentPhotoIdx + 1}/${totalPhotos}`}
         </div>
 
         {/* Baterai & Perangkat */}

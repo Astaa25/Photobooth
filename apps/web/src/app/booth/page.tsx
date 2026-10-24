@@ -97,6 +97,7 @@ export default function BoothKioskPage() {
   const [ticketNumber, setTicketNumber] = useState('');
   const [countdownNum, setCountdownNum] = useState(3);
   const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
+  const [retakeIndex, setRetakeIndex] = useState<number | null>(null);
   const [capturedPhotos, setCapturedPhotos] = useState<string[]>([]);
   const [isFlashActive, setIsFlashActive] = useState(false);
 
@@ -252,9 +253,33 @@ export default function BoothKioskPage() {
         setIsFlashActive(true);
         setTimeout(() => {
           setIsFlashActive(false);
-          const colors = ['#1D4ED8', '#BE185D', '#047857', '#B45309'];
+
+          // 1. KASUS KHUSUS RETAKE SINGLE FOTO (HANYA GANTI 1 FOTO YANG DIULANG)
+          if (retakeIndex !== null) {
+            const newPalette = [
+              '#3B82F6', '#EC4899', '#10B981', '#F59E0B',
+              '#8B5CF6', '#EF4444', '#06B6D4', '#E11D48',
+              '#14B8A6', '#F97316', '#6366F1', '#84CC16',
+            ];
+            const oldColor = capturedPhotos[retakeIndex];
+            const pool = newPalette.filter((c) => c !== oldColor);
+            const freshColor = pool[Math.floor(Math.random() * pool.length)] || newPalette[0];
+
+            const updated = [...capturedPhotos];
+            updated[retakeIndex] = freshColor;
+
+            // Pastikan panjang array tetap pas sejumlah template photoCount
+            setCapturedPhotos(updated.slice(0, selectedTemplate.photoCount));
+            setRetakeIndex(null);
+            setStep('review');
+            if (soundEnabled) retroAudio.playSuccessChime();
+            return;
+          }
+
+          // 2. KASUS NORMAL (JEPRET BERURUTAN DARI 0 SAMPAI photoCount)
+          const colors = ['#1D4ED8', '#BE185D', '#047857', '#B45309', '#7C3AED', '#DB2777'];
           const newPhotos = [...capturedPhotos, colors[currentPhotoIdx % colors.length]];
-          setCapturedPhotos(newPhotos);
+          setCapturedPhotos(newPhotos.slice(0, selectedTemplate.photoCount));
 
           if (currentPhotoIdx + 1 < selectedTemplate.photoCount) {
             setCurrentPhotoIdx(currentPhotoIdx + 1);
@@ -268,10 +293,11 @@ export default function BoothKioskPage() {
       }
     }
     return () => clearTimeout(timer);
-  }, [step, countdownNum, currentPhotoIdx, capturedPhotos, selectedTemplate.photoCount, soundEnabled]);
+  }, [step, countdownNum, currentPhotoIdx, capturedPhotos, selectedTemplate.photoCount, soundEnabled, retakeIndex]);
 
   const startCapture = () => {
     if (soundEnabled) retroAudio.playButtonClick();
+    setRetakeIndex(null);
     setCapturedPhotos([]);
     setCurrentPhotoIdx(0);
     setCountdownNum(3);
@@ -280,6 +306,7 @@ export default function BoothKioskPage() {
 
   const retakeSingle = (idx: number) => {
     if (soundEnabled) retroAudio.playButtonClick();
+    setRetakeIndex(idx);
     setCurrentPhotoIdx(idx);
     setCountdownNum(3);
     setStep('countdown');
@@ -696,7 +723,8 @@ export default function BoothKioskPage() {
           <PixelCameraViewfinder
             countdownNum={countdownNum}
             currentPhotoIdx={currentPhotoIdx}
-            totalPhotos={selectedTemplate.photoCount}
+            totalPhotos={retakeIndex !== null ? 1 : selectedTemplate.photoCount}
+            isRetake={retakeIndex !== null}
             cameraName="CANON 1200D"
           />
         )}
@@ -706,15 +734,15 @@ export default function BoothKioskPage() {
             =================================================================== */}
         {step === 'review' && (
           <div className="w-full animate-fadeIn bg-[#0C1230]/90 pixel-box p-6 sm:p-8 backdrop-blur text-center">
-            <h2 className="font-pixel-title text-base text-[#FFD84D] mb-1">
+            <h2 className="font-pixel-title text-base sm:text-lg text-[#FFD84D] mb-1">
               TINJAU HASIL FOTO ANDA
             </h2>
             <p className="text-xs text-[#A9B8FF] mb-6">
-              Puas dengan hasilnya? Anda dapat mengulang pose tertentu bila ingin bergaya lagi.
+              Puas dengan hasilnya? Anda dapat mengulang foto tertentu (hanya 1 jepretan ulang untuk mengganti pose tersebut).
             </p>
 
             <div className="flex flex-wrap items-center justify-center gap-4 mb-6">
-              {capturedPhotos.map((color, idx) => (
+              {capturedPhotos.slice(0, selectedTemplate.photoCount).map((color, idx) => (
                 <div key={idx} className="relative group">
                   <div
                     style={{ backgroundColor: color }}
@@ -724,7 +752,7 @@ export default function BoothKioskPage() {
                   </div>
                   <button
                     onClick={() => retakeSingle(idx)}
-                    className="mt-2 w-full py-1.5 pixel-btn bg-[#6700A3] hover:bg-[#E02F75] text-[10px] text-white font-bold flex items-center justify-center gap-1"
+                    className="mt-2 w-full py-1.5 pixel-btn bg-[#6700A3] hover:bg-[#E02F75] text-[10px] text-white font-bold flex items-center justify-center gap-1 shadow-sm"
                   >
                     <RotateCcw className="w-3 h-3" />
                     <span>ULANGI</span>
@@ -756,7 +784,11 @@ export default function BoothKioskPage() {
           <PixelPhotoStripDispenser
             visitorName={visitorName || 'Diana'}
             ticketNumber={ticketNumber || '#001'}
-            photos={capturedPhotos.length > 0 ? capturedPhotos : ['#1D4ED8', '#BE185D', '#047857', '#B45309']}
+            photos={
+              capturedPhotos.slice(0, selectedTemplate.photoCount).length > 0
+                ? capturedPhotos.slice(0, selectedTemplate.photoCount)
+                : ['#1D4ED8', '#BE185D', '#047857', '#B45309']
+            }
             templateName={selectedTemplate.name}
             frameImage={selectedTemplate.frameImage}
             onReset={handleFinishSession}
