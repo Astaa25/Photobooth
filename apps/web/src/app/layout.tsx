@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Bricolage_Grotesque, Figtree, Press_Start_2P, Pixelify_Sans } from 'next/font/google';
 import './globals.css';
 
@@ -32,6 +32,15 @@ export const metadata: Metadata = {
   title: 'Photobooth Terintegrasi — Expo Wisuda TIK 2026',
   description: 'Sistem photobooth modern bertema Pixel Metropolitan dengan kamera Canon dan cetak 4R.',
   manifest: '/manifest.json',
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
+  themeColor: '#050C38',
 };
 
 export default function RootLayout({

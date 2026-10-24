@@ -13,18 +13,34 @@ export interface WebcamDeviceInfo {
 /**
  * Terjemahkan error WebRTC ke instruksi ramah pengguna dalam Bahasa Indonesia
  */
+export function isSecureContextSafe(): boolean {
+  if (typeof window === 'undefined') return true;
+  return Boolean(window.isSecureContext || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+}
+
+/**
+ * Terjemahkan error WebRTC ke instruksi ramah pengguna dalam Bahasa Indonesia
+ */
 export function getHumanWebcamError(err: any): string {
   if (!err) return 'Gagal menghubungkan ke kamera laptop.';
 
   const name = err.name || '';
   const message = err.message || '';
+  const isNetworkIP = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
+
+  if (!isSecureContextSafe() || message.includes('secure context') || name === 'SecurityError') {
+    return `Browser memblokir kamera karena dibuka via IP WiFi/LAN (${typeof window !== 'undefined' ? window.location.host : ''}) tanpa HTTPS.
+Solusi:
+1. Buka di laptop langsung via http://localhost:3000
+2. ATAU di browser tablet/HP: buka chrome://flags/#unsafely-treat-insecure-origin-as-secure, tambahkan "${typeof window !== 'undefined' ? window.location.origin : 'http://...'}", aktifkan (Enabled), lalu relaunch browser.`;
+  }
 
   if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
-    return 'Izin akses kamera diblokir browser. Klik ikon gembok / kamera di sebelah kiri bilah URL browser (localhost:3000), lalu ubah izin Kamera menjadi "Izinkan" (Allow).';
+    return 'Izin akses kamera diblokir browser. Klik ikon gembok / kamera di bilah URL browser Anda, lalu pilih "Izinkan" (Allow) untuk kamera.';
   }
 
   if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
-    return 'Kamera laptop tidak terdeteksi oleh sistem operasi. Periksa tombol privasi fisik atau tombol kombinasi Fn (misalnya Fn+F6 atau Fn+F10) pada keyboard laptop Anda.';
+    return 'Kamera laptop tidak terdeteksi oleh sistem operasi. Periksa tombol privasi fisik atau tombol kombinasi Fn (misalnya Fn+F6 atau Fn+F10) pada keyboard laptop.';
   }
 
   if (name === 'NotReadableError' || name === 'TrackStartError') {
@@ -35,8 +51,8 @@ export function getHumanWebcamError(err: any): string {
     return 'Resolusi kamera yang diminta tidak didukung oleh sensor webcam laptop.';
   }
 
-  if (name === 'SecurityError' || message.includes('secure context')) {
-    return 'Browser membatasi akses webcam hanya pada URL aman (HTTPS) atau http://localhost:3000.';
+  if (isNetworkIP && !navigator.mediaDevices) {
+    return `Browser membatasi WebRTC di jaringan lokal non-HTTPS. Silakan akses via http://localhost:3000 di laptop.`;
   }
 
   return message || 'Terjadi kendala saat mengaktifkan feed video kamera laptop.';
@@ -144,6 +160,63 @@ export async function requestWebcamStream(deviceId?: string): Promise<{
   }
 
   throw lastError || new Error('Tidak dapat memperoleh feed video dari kamera mana pun.');
+}
+
+// Pengelola Singleton MediaStream untuk Mencegah Collision Perangkat di Windows
+let activeSharedStream: MediaStream | null = null;
+let activeSharedDeviceId: string | undefined = undefined;
+let activeSharedLabel: string = 'Kamera Laptop HD';
+
+/**
+ * Dapatkan stream webcam bersama (singleton) yang aman dari benturan hardware
+ */
+export async function getSharedWebcamStream(
+  deviceId?: string,
+  forceRefresh = false
+): Promise<{
+  stream: MediaStream;
+  activeDeviceId?: string;
+  label?: string;
+}> {
+  // Jika stream sudah aktif, track masih live, dan deviceId sesuai, gunakan kembali
+  if (
+    !forceRefresh &&
+    activeSharedStream &&
+    activeSharedStream.active &&
+    activeSharedStream.getVideoTracks().some((t) => t.readyState === 'live')
+  ) {
+    if (!deviceId || activeSharedDeviceId === deviceId) {
+      return {
+        stream: activeSharedStream,
+        activeDeviceId: activeSharedDeviceId,
+        label: activeSharedLabel,
+      };
+    }
+  }
+
+  // Hentikan stream lama sebelum meminta baru agar driver kamera Windows tidak terkunci
+  if (activeSharedStream) {
+    stopWebcamStream(activeSharedStream);
+    activeSharedStream = null;
+  }
+
+  const result = await requestWebcamStream(deviceId);
+  activeSharedStream = result.stream;
+  activeSharedDeviceId = result.activeDeviceId;
+  activeSharedLabel = result.label || 'Kamera Laptop HD';
+
+  return result;
+}
+
+/**
+ * Hentikan dan bersihkan stream singleton webcam
+ */
+export function releaseSharedWebcamStream(): void {
+  if (activeSharedStream) {
+    stopWebcamStream(activeSharedStream);
+    activeSharedStream = null;
+    activeSharedDeviceId = undefined;
+  }
 }
 
 /**

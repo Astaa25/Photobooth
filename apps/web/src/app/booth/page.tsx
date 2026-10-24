@@ -16,12 +16,18 @@ import {
   Hourglass,
   Radio,
   AlertTriangle,
+  X,
+  RefreshCw,
+  Play,
 } from 'lucide-react';
 import { retroAudio } from '@/utils/audio';
 import {
-  requestWebcamStream,
+  getSharedWebcamStream,
+  bindStreamToVideo,
   stopWebcamStream,
   getHumanWebcamError,
+  enumerateVideoDevices,
+  type WebcamDeviceInfo,
 } from '@/utils/webcamHelper';
 import {
   PixelStreetLamp,
@@ -112,6 +118,13 @@ export default function BoothKioskPage() {
   const [webcamErrorMsg, setWebcamErrorMsg] = useState<string | null>(null);
   const latestWebcamSnapshotRef = useRef<string | null>(null);
 
+  // State Modal Uji Live Feed Webcam Laptop
+  const [isWebcamModalOpen, setIsWebcamModalOpen] = useState(false);
+  const [testSnapshotUrl, setTestSnapshotUrl] = useState<string | null>(null);
+  const [webcamDevices, setWebcamDevices] = useState<WebcamDeviceInfo[]>([]);
+  const [selectedWebcamId, setSelectedWebcamId] = useState<string>('');
+  const testVideoRef = useRef<HTMLVideoElement | null>(null);
+
   // Periksa apakah tablet sudah diaktifkan di sesi browser ini
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -128,15 +141,14 @@ export default function BoothKioskPage() {
     }
   }, []);
 
-  // Uji koneksi webcam laptop di latar belakang agar siap sebelum sesi dimulai
+  // Uji koneksi webcam laptop di latar belakang menggunakan singleton stream
   useEffect(() => {
-    let testStream: MediaStream | null = null;
     if (cameraSource === 'webcam') {
-      requestWebcamStream()
-        .then((res) => {
-          testStream = res.stream;
+      getSharedWebcamStream(selectedWebcamId || undefined)
+        .then(() => {
           setWebcamStatus('connected');
           setWebcamErrorMsg(null);
+          enumerateVideoDevices().then(setWebcamDevices);
         })
         .catch((err) => {
           setWebcamStatus('error');
@@ -146,11 +158,7 @@ export default function BoothKioskPage() {
       setWebcamStatus('idle');
       setWebcamErrorMsg(null);
     }
-
-    return () => {
-      stopWebcamStream(testStream);
-    };
-  }, [cameraSource]);
+  }, [cameraSource, selectedWebcamId]);
 
   // Ganti sumber kamera dan broadcast ke jendela admin
   const handleSwitchCamera = (source: 'canon' | 'webcam') => {
@@ -161,6 +169,72 @@ export default function BoothKioskPage() {
       channel.postMessage({ type: 'CAMERA_CHANGED', cameraSource: source });
       channel.close();
     } catch {}
+
+    if (source === 'webcam') {
+      getSharedWebcamStream(selectedWebcamId || undefined)
+        .then(() => {
+          setWebcamStatus('connected');
+          setWebcamErrorMsg(null);
+        })
+        .catch((err) => {
+          setWebcamStatus('error');
+          setWebcamErrorMsg(getHumanWebcamError(err));
+        });
+    }
+  };
+
+  // Buka modal uji kamera laptop dan pasangkan feed langsung
+  const handleOpenWebcamTest = async () => {
+    setIsWebcamModalOpen(true);
+    setCameraSource('webcam');
+    try {
+      localStorage.setItem('photobooth_selected_camera', 'webcam');
+      const channel = new BroadcastChannel('photobooth_session_sync');
+      channel.postMessage({ type: 'CAMERA_CHANGED', cameraSource: 'webcam' });
+      channel.close();
+    } catch {}
+
+    try {
+      const res = await getSharedWebcamStream(selectedWebcamId || undefined);
+      setWebcamStatus('connected');
+      setWebcamErrorMsg(null);
+      if (testVideoRef.current) {
+        await bindStreamToVideo(testVideoRef.current, res.stream);
+      }
+      const devs = await enumerateVideoDevices();
+      setWebcamDevices(devs);
+    } catch (err: any) {
+      setWebcamStatus('error');
+      setWebcamErrorMsg(getHumanWebcamError(err));
+    }
+  };
+
+  // Jepret foto uji coba di modal
+  const handleCaptureTestSnapshot = () => {
+    if (testVideoRef.current && testVideoRef.current.videoWidth > 0) {
+      const video = testVideoRef.current;
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const url = canvas.toDataURL('image/jpeg', 0.9);
+        setTestSnapshotUrl(url);
+        if (soundEnabled) retroAudio.playShutterSound();
+      }
+    }
+  };
+
+  // Mulai sesi foto uji mandiri langsung dari tablet (tanpa harus tunggu admin)
+  const handleQuickDemoStart = () => {
+    setVisitorName('WISUDAWAN TIK 2026');
+    setTicketNumber('#DEMO-01');
+    setCapturedPhotos([]);
+    setStep('choosing_design');
+    if (soundEnabled) retroAudio.playSuccessChime();
   };
 
   // Sinkronisasi Sesi Aktif & Desain Bingkai dengan Admin Dashboard secara Real-Time
@@ -304,8 +378,8 @@ export default function BoothKioskPage() {
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (step === 'countdown') {
-      // Jika kamera laptop sedang mengalami kendala izin/koneksi, tahan countdown agar user bisa klik Izinkan
-      if (cameraSource === 'webcam' && webcamStatus === 'error') {
+      // Jika mode kamera laptop aktif tapi belum terhubung, tahan countdown agar tidak memotret layar kosong
+      if (cameraSource === 'webcam' && webcamStatus !== 'connected') {
         return;
       }
 
@@ -554,10 +628,10 @@ export default function BoothKioskPage() {
   }
 
   // =========================================================================
-  // 2. TAMPILAN APLIKASI BOOTH (STANDBY / SESI FOTO) - BISA DI-SCROLL
+  // 2. TAMPILAN APLIKASI BOOTH (STANDBY / SESI FOTO) - FLUTTER APK TABLET STYLE
   // =========================================================================
   return (
-    <div className="relative w-screen h-screen bg-[#050C38] text-white flex flex-col justify-between overflow-x-hidden select-none font-pixel">
+    <div className="relative w-screen h-[100dvh] bg-[#050C38] text-white flex flex-col justify-between overflow-hidden select-none font-pixel touch-manipulation">
       {/* 1. Latar Belakang Gradien Langit Malam Metropolitan */}
       <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#160078] via-[#050C38] to-[#010030] pointer-events-none" />
 
@@ -641,40 +715,53 @@ export default function BoothKioskPage() {
           )}
 
           {/* Tombol Opsi Sumber Kamera (Canon DSLR vs Laptop Webcam) */}
-          <button
-            type="button"
-            onClick={() => {
-              if (soundEnabled) retroAudio.playButtonClick();
-              handleSwitchCamera(cameraSource === 'canon' ? 'webcam' : 'canon');
-            }}
-            className={`flex items-center gap-1.5 px-2.5 py-1 bg-[#131947] hover:bg-[#160078] border-2 text-[11px] font-pixel-title transition-colors ${
-              cameraSource === 'webcam' && webcamStatus === 'error'
-                ? 'border-[#FE0168] text-[#FE0168]'
-                : cameraSource === 'webcam' && webcamStatus === 'connected'
-                ? 'border-[#00E599] text-[#00E599]'
-                : 'border-[#4B57B2] text-[#5CE1E6]'
-            }`}
-            title="Ganti Sumber Kamera (Canon DSLR vs Laptop Webcam)"
-          >
-            {cameraSource === 'webcam' ? (
-              <>
-                <Laptop className="w-3.5 h-3.5" />
-                <span>
-                  KAMERA: LAPTOP{' '}
-                  {webcamStatus === 'connected'
-                    ? '(OK)'
-                    : webcamStatus === 'error'
-                    ? '(KENDALA)'
-                    : ''}
-                </span>
-              </>
-            ) : (
-              <>
-                <Camera className="w-3.5 h-3.5 text-[#00E599]" />
-                <span className="text-[#00E599]">KAMERA: CANON 1200D</span>
-              </>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                if (soundEnabled) retroAudio.playButtonClick();
+                handleSwitchCamera(cameraSource === 'canon' ? 'webcam' : 'canon');
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 bg-[#131947] hover:bg-[#160078] border-2 text-[11px] font-pixel-title transition-all active:scale-95 ${
+                cameraSource === 'webcam' && webcamStatus === 'error'
+                  ? 'border-[#FE0168] text-[#FE0168]'
+                  : cameraSource === 'webcam' && webcamStatus === 'connected'
+                  ? 'border-[#00E599] text-[#00E599]'
+                  : 'border-[#4B57B2] text-[#5CE1E6]'
+              }`}
+              title="Ganti Sumber Kamera (Canon DSLR vs Laptop Webcam)"
+            >
+              {cameraSource === 'webcam' ? (
+                <>
+                  <Laptop className="w-3.5 h-3.5" />
+                  <span>
+                    KAMERA: LAPTOP{' '}
+                    {webcamStatus === 'connected'
+                      ? '● SIAP'
+                      : webcamStatus === 'error'
+                      ? '● KENDALA'
+                      : '● CEK'}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Camera className="w-3.5 h-3.5 text-[#00E599]" />
+                  <span className="text-[#00E599]">KAMERA: CANON 1200D</span>
+                </>
+              )}
+            </button>
+
+            {cameraSource === 'webcam' && (
+              <button
+                type="button"
+                onClick={handleOpenWebcamTest}
+                className="px-2 py-1.5 bg-[#6700A3] hover:bg-[#FE0168] border-2 border-[#5CE1E6] text-white text-[10px] font-pixel-title active:scale-95"
+                title="Buka Jendela Uji Live Feed Webcam"
+              >
+                UJI
+              </button>
             )}
-          </button>
+          </div>
 
           <button
             onClick={() => {
@@ -705,34 +792,129 @@ export default function BoothKioskPage() {
       {/* Konten Utama Interaktif Booth (Bisa Di-scroll Secara Mulus) */}
       <main className="flex-1 overflow-y-auto overflow-x-hidden w-full max-w-5xl mx-auto p-4 sm:p-6 z-20 relative flex flex-col items-center justify-center my-auto">
         {/* ===================================================================
-            STEP 0: STANDBY (MOHON TUNGGU SEBENTAR - BELUM DI-SET OLEH ADMIN)
+            STEP 0: STANDBY (MOHON TUNGGU SEBENTAR / PILIH KAMERA)
             =================================================================== */}
         {step === 'standby' && (
-          <div className="animate-fadeIn max-w-xl w-full bg-[#0C1230]/95 pixel-box p-8 text-center backdrop-blur shadow-[0_0_24px_rgba(5,12,56,0.9)]">
-            <div className="w-16 h-16 mx-auto pixel-box-cyber bg-[#160078] text-[#FFD84D] flex items-center justify-center mb-5">
-              <Hourglass className="w-8 h-8 animate-spin" style={{ animationDuration: '6s' }} />
+          <div className="animate-fadeIn max-w-xl w-full bg-[#0C1230]/95 pixel-box p-6 sm:p-8 text-center backdrop-blur shadow-[0_0_24px_rgba(5,12,56,0.9)] my-auto">
+            <div className="w-14 h-14 mx-auto pixel-box-cyber bg-[#160078] text-[#FFD84D] flex items-center justify-center mb-3">
+              <Hourglass className="w-7 h-7 animate-spin" style={{ animationDuration: '6s' }} />
             </div>
 
-            <div className="flex items-center justify-center gap-2 mb-2">
+            <div className="flex items-center justify-center gap-2 mb-1">
               <PixelCrossStar size={12} />
-              <h1 className="font-pixel-title text-lg sm:text-2xl text-[#FFD84D] tracking-wider leading-relaxed">
-                MOHON TUNGGU SEBENTAR
+              <h1 className="font-pixel-title text-base sm:text-xl text-[#FFD84D] tracking-wider leading-relaxed">
+                BILIK PHOTOBOOTH TABLET KIOSK
               </h1>
               <PixelCrossStar size={12} />
             </div>
 
-            <h2 className="font-pixel-title text-xs sm:text-sm text-[#5CE1E6] mb-6">
-              BILIK PHOTOBOOTH SEDANG DISIAPKAN
+            <h2 className="font-pixel-title text-xs text-[#5CE1E6] mb-4">
+              EXPO WISUDA POLITEKNIK JURUSAN TIK 2026
             </h2>
 
-            <p className="text-xs sm:text-sm text-white/80 mb-6 leading-relaxed">
-              Silakan menunggu arahan dari operator di meja kendali. Layar ini akan <span className="text-[#FFD84D] font-bold">otomatis aktif</span> begitu nama dan nomor antrean Anda dipanggil untuk berfoto.
-            </p>
+            {/* KARTU PENGATURAN SUMBER KAMERA */}
+            <div className="bg-[#050C38] border-2 border-[#4B57B2] p-3.5 mb-4 text-left">
+              <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-[#4B57B2]/40">
+                <span className="text-[10px] font-pixel-title text-[#FFD84D]">
+                  PILIH SUMBER KAMERA BOOTH:
+                </span>
+                <span className={`text-[9px] font-pixel-title ${cameraSource === 'webcam' ? 'text-[#5CE1E6]' : 'text-[#00E599]'}`}>
+                  {cameraSource === 'webcam' ? 'KAMERA LAPTOP' : 'CANON DSLR'}
+                </span>
+              </div>
 
-            {/* Indikator Status Standby */}
-            <div className="p-3 bg-[#050C38] border-2 border-[#4B57B2] flex items-center justify-center gap-3 text-[11px] font-pixel-title text-[#A9B8FF]">
-              <span className="w-2.5 h-2.5 bg-[#FFD84D] animate-ping" />
-              <span>STATUS: STANDBY &bull; MENUNGGU OPERATOR</span>
+              <div className="grid grid-cols-2 gap-2 mb-2.5">
+                <button
+                  type="button"
+                  onClick={() => handleSwitchCamera('webcam')}
+                  className={`p-2.5 pixel-btn text-left flex items-center gap-2 text-xs font-pixel-title transition-all active:scale-95 ${
+                    cameraSource === 'webcam'
+                      ? 'bg-[#5CE1E6] text-[#050C38] border-2 border-white font-bold shadow'
+                      : 'bg-[#131947] text-white/70 hover:bg-[#160078]'
+                  }`}
+                >
+                  <Laptop className="w-4 h-4 shrink-0" />
+                  <span className="truncate">KAMERA LAPTOP</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleSwitchCamera('canon')}
+                  className={`p-2.5 pixel-btn text-left flex items-center gap-2 text-xs font-pixel-title transition-all active:scale-95 ${
+                    cameraSource === 'canon'
+                      ? 'bg-[#00E599] text-[#050C38] border-2 border-white font-bold shadow'
+                      : 'bg-[#131947] text-white/70 hover:bg-[#160078]'
+                  }`}
+                >
+                  <Camera className="w-4 h-4 shrink-0" />
+                  <span className="truncate">CANON 1200D</span>
+                </button>
+              </div>
+
+              {/* Status & Tombol Uji Feed Kamera Laptop */}
+              {cameraSource === 'webcam' && (
+                <div className="flex items-center justify-between bg-[#0C1230] p-2 border border-[#4B57B2]/60 text-[10px] font-pixel-title">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`w-2 h-2 ${
+                        webcamStatus === 'connected'
+                          ? 'bg-[#00E599]'
+                          : webcamStatus === 'error'
+                          ? 'bg-[#FE0168]'
+                          : 'bg-[#FFD84D]'
+                      } rounded-none animate-ping`}
+                    />
+                    <span
+                      className={
+                        webcamStatus === 'connected'
+                          ? 'text-[#00E599]'
+                          : webcamStatus === 'error'
+                          ? 'text-[#FE0168]'
+                          : 'text-[#FFD84D]'
+                      }
+                    >
+                      {webcamStatus === 'connected'
+                        ? 'SIAP DIGUNAKAN'
+                        : webcamStatus === 'error'
+                        ? 'KENDALA AKSES IZIN'
+                        : 'MENGHUBUNGKAN...'}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleOpenWebcamTest}
+                    className="px-2.5 py-1 pixel-btn bg-[#6700A3] hover:bg-[#FE0168] text-white text-[9px] flex items-center gap-1 font-bold active:scale-95"
+                  >
+                    <Laptop className="w-3 h-3" />
+                    <span>UJI LIVE FEED</span>
+                  </button>
+                </div>
+              )}
+
+              {/* Pesan Error & Solusi jika Ada */}
+              {cameraSource === 'webcam' && webcamStatus === 'error' && (
+                <div className="mt-2 p-2 bg-[#FE0168]/20 border border-[#FE0168] text-[10px] text-[#FFD84D] leading-tight font-sans">
+                  {webcamErrorMsg || 'Browser belum mengizinkan akses kamera webcam.'}
+                </div>
+              )}
+            </div>
+
+            {/* Tombol Mulai Sesi Mandiri / Uji Coba */}
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={handleQuickDemoStart}
+                className="w-full h-12 px-6 pixel-btn bg-[#E02F75] hover:bg-[#FE0168] text-white text-xs font-pixel-title font-bold flex items-center justify-center gap-2 shadow-[4px_4px_0_0_#6700A3] active:scale-95"
+              >
+                <Sparkles className="w-4 h-4 text-[#FFD84D]" />
+                <span>MULAI SESI FOTO MANDIRI (UJI COBA)</span>
+              </button>
+
+              <div className="p-2 bg-[#050C38]/80 border border-[#4B57B2]/40 text-[10px] text-[#A9B8FF] font-pixel-title flex items-center justify-center gap-2">
+                <span className="w-2 h-2 bg-[#FFD84D] animate-pulse" />
+                <span>MENUNGGU PANGGILAN ANTREAN DARI OPERATOR ADMIN</span>
+              </div>
             </div>
           </div>
         )}
@@ -834,21 +1016,10 @@ export default function BoothKioskPage() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    requestWebcamStream()
-                      .then((res) => {
-                        stopWebcamStream(res.stream);
-                        setWebcamStatus('connected');
-                        setWebcamErrorMsg(null);
-                      })
-                      .catch((err) => {
-                        setWebcamStatus('error');
-                        setWebcamErrorMsg(getHumanWebcamError(err));
-                      });
-                  }}
-                  className="px-3 py-1.5 bg-[#00E599] hover:bg-[#5CE1E6] text-[#050C38] text-[10px] font-pixel-title shrink-0 font-bold"
+                  onClick={handleOpenWebcamTest}
+                  className="px-3 py-1.5 bg-[#00E599] hover:bg-[#5CE1E6] text-[#050C38] text-[10px] font-pixel-title shrink-0 font-bold active:scale-95"
                 >
-                  HUBUNGKAN
+                  HUBUNGKAN &amp; UJI
                 </button>
               </div>
             )}
@@ -973,10 +1144,102 @@ export default function BoothKioskPage() {
       </main>
 
       {/* Footer Kios */}
-      <footer className="px-6 py-3 border-t-4 border-[#4B57B2] flex items-center justify-between text-[11px] text-[#A9B8FF] z-30 bg-[#0C1230]/90">
+      <footer className="px-6 py-2.5 border-t-4 border-[#4B57B2] flex items-center justify-between text-[11px] text-[#A9B8FF] z-30 bg-[#0C1230]/90 shrink-0">
         <span>EXPO WISUDA JURUSAN TIK 2026 &bull; PHOTOBOOTH SYSTEM</span>
         <span className="text-[#FFD84D]">CANON 1200D &bull; EPSON L300 4R READY</span>
       </footer>
+
+      {/* Modal Uji Kamera Laptop */}
+      {isWebcamModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm font-pixel">
+          <div className="relative w-full max-w-lg bg-[#0C1230] border-4 border-[#5CE1E6] p-5 shadow-[8px_8px_0_0_#050C38] text-white">
+            <div className="flex items-center justify-between pb-3 mb-3 border-b-2 border-[#4B57B2]">
+              <div className="flex items-center gap-2">
+                <Laptop className="w-5 h-5 text-[#5CE1E6]" />
+                <h3 className="font-pixel-title text-xs sm:text-sm text-[#FFD84D]">
+                  UJI LIVE FEED KAMERA LAPTOP
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsWebcamModalOpen(false)}
+                className="p-1 text-white/60 hover:text-[#FE0168]"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Video Preview */}
+            <div className="relative aspect-[4/3] w-full bg-black border-2 border-[#4B57B2] overflow-hidden mb-3">
+              <video
+                ref={testVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover scale-x-[-1]"
+              />
+
+              {webcamStatus === 'connected' && (
+                <div className="absolute top-2 left-2 bg-black/75 px-2 py-0.5 border border-[#00E599] text-[#00E599] text-[9px] font-pixel-title flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 bg-[#00E599] animate-pulse" />
+                  <span>LIVE 720P HD</span>
+                </div>
+              )}
+
+              {testSnapshotUrl && (
+                <div className="absolute bottom-2 right-2 w-24 aspect-[4/3] border-2 border-[#FFD84D] shadow-lg overflow-hidden bg-black">
+                  <img src={testSnapshotUrl} alt="Hasil Snapshot" className="w-full h-full object-cover" />
+                </div>
+              )}
+            </div>
+
+            {/* Selector Device jika ada lebih dari 1 kamera */}
+            {webcamDevices.length > 1 && (
+              <div className="mb-3">
+                <label className="block text-[10px] font-pixel-title text-[#A9B8FF] mb-1">
+                  PILIH PERANGKAT KAMERA:
+                </label>
+                <select
+                  value={selectedWebcamId}
+                  onChange={(e) => {
+                    setSelectedWebcamId(e.target.value);
+                    getSharedWebcamStream(e.target.value, true).then((res) => {
+                      if (testVideoRef.current) bindStreamToVideo(testVideoRef.current, res.stream);
+                    });
+                  }}
+                  className="w-full bg-[#050C38] border-2 border-[#4B57B2] text-xs text-white p-2 outline-none font-pixel"
+                >
+                  {webcamDevices.map((d) => (
+                    <option key={d.deviceId} value={d.deviceId}>
+                      {d.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleCaptureTestSnapshot}
+                className="flex-1 py-2.5 pixel-btn bg-[#00E599] hover:bg-[#5CE1E6] text-[#050C38] text-xs font-pixel-title font-bold flex items-center justify-center gap-1.5 active:scale-95"
+              >
+                <Camera className="w-4 h-4" />
+                <span>JEPRET FOTO CONTOH</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsWebcamModalOpen(false)}
+                className="px-4 py-2.5 pixel-btn bg-[#131947] hover:bg-[#160078] text-[#FFD84D] text-xs font-pixel-title border border-[#4B57B2] active:scale-95"
+              >
+                GUNAKAN INI
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

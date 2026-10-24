@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Camera, Laptop, RefreshCw, VideoOff, Check, AlertTriangle } from 'lucide-react';
 import {
-  requestWebcamStream,
+  getSharedWebcamStream,
   bindStreamToVideo,
   stopWebcamStream,
   getHumanWebcamError,
@@ -55,14 +55,9 @@ export function PixelCameraViewfinder({
     setIsConnecting(true);
     setWebcamError(null);
 
-    // Hentikan stream sebelumnya jika ada
-    stopWebcamStream(currentStreamRef.current);
-    currentStreamRef.current = null;
-    setHasWebcamStream(false);
-
     try {
       const devId = targetDeviceId || selectedDeviceId || undefined;
-      const result = await requestWebcamStream(devId);
+      const result = await getSharedWebcamStream(devId);
       currentStreamRef.current = result.stream;
 
       if (result.label) {
@@ -93,16 +88,9 @@ export function PixelCameraViewfinder({
     if (cameraSource === 'webcam') {
       connectWebcam();
     } else {
-      stopWebcamStream(currentStreamRef.current);
-      currentStreamRef.current = null;
       setHasWebcamStream(false);
       setWebcamError(null);
     }
-
-    return () => {
-      stopWebcamStream(currentStreamRef.current);
-      currentStreamRef.current = null;
-    };
   }, [cameraSource]);
 
   // Ambil snapshot foto dari video webcam saat countdown mencapai 0

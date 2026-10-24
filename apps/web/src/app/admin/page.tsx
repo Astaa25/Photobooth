@@ -57,6 +57,8 @@ import {
   enumerateVideoDevices,
   type WebcamDeviceInfo,
 } from '@/utils/webcamHelper';
+import { PixelTemplateEditorModal } from '@/components/pixel/PixelTemplateEditorModal';
+import type { FrameTemplateItem } from '@/app/api/frames/route';
 
 // Tipe Data Kategori Kolom yang Dapat Dikonfigurasi
 export interface KanbanCategory {
@@ -68,18 +70,8 @@ export interface KanbanCategory {
   active: boolean;
 }
 
-// Tipe Data Desain Frame
-export interface CustomTemplate {
-  slug: string;
-  name: string;
-  desc: string;
-  photoCount: number;
-  previewType: 'strip' | 'grid' | 'trio' | 'duo' | 'single';
-  frameImage?: string; // Data URL PNG atau path aset lokal
-  isCustom?: boolean;
-  slotRatio?: '4:3' | '16:9' | '3:2';
-  slots?: DetectedSlot[];
-}
+// Tipe Data Desain Frame (Kompatibel dengan Schema 1200x1800 4R)
+export type CustomTemplate = FrameTemplateItem;
 
 interface QueueItem {
   id: string;
@@ -166,6 +158,8 @@ export default function AdminDashboardPage() {
 
   // State Desain Frame & Pemindai Slot Lubang Landscape
   const [templates, setTemplates] = useState<CustomTemplate[]>(DEFAULT_TEMPLATES);
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<FrameTemplateItem | null>(null);
   const [frameName, setFrameName] = useState('');
   const [frameCount, setFrameCount] = useState<number>(4);
   const [frameLayout, setFrameLayout] = useState<'strip' | 'grid' | 'trio' | 'duo' | 'single'>('strip');
@@ -351,6 +345,45 @@ export default function AdminDashboardPage() {
         source === 'canon' ? 'Canon EOS 1200D DSLR (USB)' : 'Kamera Laptop (Integrated HD Webcam)'
       }`
     );
+  };
+
+  // Handler Modal Ubah / Tambah Template Persis Gambar 1
+  const handleOpenAddTemplate = () => {
+    setEditingTemplate(null);
+    setIsTemplateModalOpen(true);
+  };
+
+  const handleOpenEditTemplate = (tpl: FrameTemplateItem) => {
+    setEditingTemplate(tpl);
+    setIsTemplateModalOpen(true);
+  };
+
+  const handleTemplateSaved = (saved: FrameTemplateItem) => {
+    fetch('/api/frames')
+      .then((res) => res.json())
+      .then((res) => {
+        if (res.success && Array.isArray(res.data)) {
+          setTemplates(res.data);
+        }
+      })
+      .catch(() => {
+        setTemplates((prev) => {
+          const idx = prev.findIndex((t) => t.slug === saved.slug);
+          if (idx >= 0) {
+            return prev.map((t, i) => (i === idx ? saved : t));
+          }
+          return [...prev, saved];
+        });
+      });
+
+    try {
+      const channel = new BroadcastChannel('photobooth_session_sync');
+      channel.postMessage({ type: 'TEMPLATES_UPDATED', template: saved });
+      channel.close();
+    } catch {}
+
+    if (soundEnabled) retroAudio.playSuccessChime();
+    showToast(`Template "${saved.name}" berhasil disimpan!`);
   };
 
   // 3. Heartbeat Auto-Refresh Berkelanjutan (Selalu Loading & Sinkron Setiap 2.5 Detik)
@@ -1597,10 +1630,21 @@ export default function AdminDashboardPage() {
 
               {/* Daftar Semua Frame Aktif */}
               <div className="bg-[#0C1230]/95 pixel-box p-6">
-                <h3 className="font-pixel-title text-xs text-[#5CE1E6] mb-4 flex items-center gap-2">
-                  <Layers className="w-4 h-4" />
-                  <span>DAFTAR DESAIN FRAME AKTIF DI BOOTH ({templates.length})</span>
-                </h3>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-[#4B57B2]/40">
+                  <h3 className="font-pixel-title text-xs text-[#5CE1E6] flex items-center gap-2">
+                    <Layers className="w-4 h-4" />
+                    <span>DAFTAR DESAIN FRAME AKTIF DI BOOTH ({templates.length})</span>
+                  </h3>
+
+                  <button
+                    type="button"
+                    onClick={handleOpenAddTemplate}
+                    className="px-4 py-2 pixel-btn bg-[#FFD84D] hover:bg-[#FFE57F] text-[#050C38] text-xs font-pixel-title font-bold flex items-center gap-1.5 shadow"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>+ TAMBAH TEMPLATE (MODAL 4R)</span>
+                  </button>
+                </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   {templates.map((tpl) => (
@@ -1635,26 +1679,37 @@ export default function AdminDashboardPage() {
                         <p className="text-[10px] text-white/60 mb-2 leading-snug">{tpl.desc}</p>
                       </div>
 
-                      <div className="flex items-center justify-between pt-2 border-t border-[#4B57B2]/40 text-[9px] font-pixel-title gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setUploadedFramePreview(tpl.frameImage || null);
-                            setFrameName(tpl.name);
-                            setFrameDesc(tpl.desc);
-                            setFrameLayout(tpl.previewType);
-                            setFrameCount(tpl.photoCount);
-                            if (tpl.frameImage) {
-                              runFrameScan(tpl.frameImage, photoRatio);
-                            }
-                            showToast(`Template "${tpl.name}" dimuat ke simulator pemindai!`);
-                          }}
-                          className="px-2 py-1 pixel-btn bg-[#6700A3] hover:bg-[#E02F75] text-white flex items-center gap-1 shadow-sm"
-                          title="Tampilkan & Pindai di Simulator"
-                        >
-                          <Scan className="w-3 h-3" />
-                          <span>UJI PINDAI</span>
-                        </button>
+                      <div className="flex flex-wrap items-center justify-between pt-2 border-t border-[#4B57B2]/40 text-[9px] font-pixel-title gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditTemplate(tpl)}
+                            className="px-2.5 py-1 pixel-btn bg-[#FFD84D] hover:bg-[#FFE57F] text-[#050C38] flex items-center gap-1 font-bold shadow-sm"
+                            title="Ubah Konfigurasi Slot & Template (Gambar 1)"
+                          >
+                            <Edit3 className="w-3 h-3" />
+                            <span>UBAH</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setUploadedFramePreview(tpl.frameImage || null);
+                              setFrameName(tpl.name);
+                              setFrameDesc(tpl.desc);
+                              setFrameLayout(tpl.previewType);
+                              setFrameCount(tpl.photoCount);
+                              if (tpl.frameImage) {
+                                runFrameScan(tpl.frameImage, photoRatio);
+                              }
+                              showToast(`Template "${tpl.name}" dimuat ke simulator pemindai!`);
+                            }}
+                            className="px-2 py-1 pixel-btn bg-[#6700A3] hover:bg-[#E02F75] text-white flex items-center gap-1 shadow-sm"
+                            title="Tampilkan & Pindai di Simulator"
+                          >
+                            <Scan className="w-3 h-3" />
+                            <span>PINDAI</span>
+                          </button>
+                        </div>
                         <span className="text-[#00E599]">{tpl.photoCount} FOTO &bull; 4R</span>
                         {tpl.isCustom && (
                           <button
@@ -2006,6 +2061,14 @@ export default function AdminDashboardPage() {
         </button>
       </div>
     )}
+
+    {/* Modal Ubah / Tambah Template Persis Gambar 1 */}
+    <PixelTemplateEditorModal
+      isOpen={isTemplateModalOpen}
+      onClose={() => setIsTemplateModalOpen(false)}
+      template={editingTemplate}
+      onSave={handleTemplateSaved}
+    />
   </>
   );
 }
