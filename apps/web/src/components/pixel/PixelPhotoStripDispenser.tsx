@@ -74,14 +74,6 @@ export function PixelPhotoStripDispenser({
               dispensed ? 'translate-y-0 opacity-100' : '-translate-y-12 opacity-30'
             }`}
           >
-            {/* Frame PNG Overlay Kustom jika ada */}
-            {frameImage && (
-              <img
-                src={frameImage}
-                alt="Frame Overlay"
-                className="absolute inset-0 w-full h-full object-fill pointer-events-none z-20 opacity-90 pixel-art"
-              />
-            )}
 
             {/* Header Strip Foto */}
             <div className="text-center pb-2 mb-2 border-b-2 border-dashed border-[#5CE1E6]/40 relative z-10">

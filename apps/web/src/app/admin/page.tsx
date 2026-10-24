@@ -532,7 +532,7 @@ export default function AdminDashboardPage() {
               }`}
             >
               <LayoutDashboard className="w-4 h-4 text-[#5CE1E6]" />
-              <span>PAPAN ANTREAN ({queue.length})</span>
+              <span>ANTREAN PENGUNJUNG ({queue.length})</span>
             </button>
 
             <button
@@ -636,7 +636,7 @@ export default function AdminDashboardPage() {
         <header className="h-16 bg-[#0C1230]/90 border-b-4 border-[#4B57B2] px-6 flex items-center justify-between shrink-0 backdrop-blur">
           <div className="flex items-center gap-3">
             <h2 className="font-pixel-title text-sm sm:text-base text-[#FFD84D] tracking-wide">
-              {activeTab === 'board' && 'PAPAN KANBAN ANTREAN PENGUNJUNG'}
+              {activeTab === 'board' && 'ANTREAN PENGUNJUNG'}
               {activeTab === 'categories' && 'PENGATURAN KATEGORI KOLOM'}
               {activeTab === 'frames' && 'KELOLA & UNGGAH DESIGN FRAME 4R'}
               {activeTab === 'hardware' && 'MONITOR DRIVER HARDWARE CANON & EPSON'}
@@ -697,15 +697,16 @@ export default function AdminDashboardPage() {
         )}
 
         {/* Body Area Sesuai Tab Aktif */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6">
+        {/* Body Area Sesuai Tab Aktif */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-4">
           {/* =================================================================
-              TAB 1: PAPAN KANBAN (DILAYAR MUAT KOLOM KATEGORI SEIMBANG)
+              TAB 1: PAPAN ANTREAN PENGUNJUNG (5 KOLOM MUAT PRESISI DI 1 LAYAR)
               ================================================================= */}
           {activeTab === 'board' && (
             <div
-              className="grid gap-3.5 items-start"
+              className="grid gap-2.5 items-start w-full"
               style={{
-                gridTemplateColumns: `repeat(${categories.filter((c) => c.active).length}, minmax(220px, 1fr))`,
+                gridTemplateColumns: `repeat(${categories.filter((c) => c.active).length}, minmax(0, 1fr))`,
               }}
             >
               {categories
@@ -716,28 +717,29 @@ export default function AdminDashboardPage() {
                   return (
                     <div
                       key={category.id}
-                      className="bg-[#0C1230]/90 pixel-box p-3.5 flex flex-col min-h-[550px]"
+                      className="bg-[#0C1230]/95 pixel-box p-2.5 flex flex-col min-h-[520px] min-w-0"
                     >
                       {/* Header Kolom Kategori */}
                       <div
-                        className="pb-2.5 mb-3 border-b-2 flex items-center justify-between"
+                        className="pb-2 mb-2.5 border-b-2 flex items-center justify-between gap-1"
                         style={{ borderColor: category.color }}
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
                           <span
-                            className="w-2.5 h-2.5"
+                            className="w-2 h-2 shrink-0"
                             style={{ backgroundColor: category.color }}
                           />
                           <h3
-                            className="font-pixel-title text-xs tracking-wider"
+                            className="font-pixel-title text-[10px] sm:text-[11px] tracking-wider truncate"
                             style={{ color: category.color }}
+                            title={category.title}
                           >
                             {category.title}
                           </h3>
                         </div>
 
                         <span
-                          className="px-2 py-0.5 text-[10px] font-pixel-title border"
+                          className="px-1.5 py-0.5 text-[9px] font-pixel-title border shrink-0"
                           style={{
                             color: category.color,
                             backgroundColor: category.badgeBg,
@@ -749,7 +751,7 @@ export default function AdminDashboardPage() {
                       </div>
 
                       {/* Daftar Kartu Tiket dalam Kolom */}
-                      <div className="flex-1 space-y-3 overflow-y-auto max-h-[620px] pr-1">
+                      <div className="flex-1 space-y-2.5 overflow-y-auto max-h-[640px] pr-0.5">
                         {categoryItems.length === 0 ? (
                           <div className="p-4 text-center text-white/30 text-[10px] font-pixel-title border-2 border-dashed border-white/10 mt-6">
                             Kosong
@@ -758,20 +760,20 @@ export default function AdminDashboardPage() {
                           categoryItems.map((item) => (
                             <div
                               key={item.id}
-                              className={`bg-[#131947]/80 pixel-box p-3 hover:bg-[#161F54] transition-all ${
+                              className={`bg-[#131947]/90 pixel-box p-2.5 hover:bg-[#161F54] transition-all min-w-0 ${
                                 category.key === 'IN_SESSION'
                                   ? 'border-2 border-[#FE0168] bg-[#1C184A] shadow-[0_0_12px_rgba(254,1,104,0.3)] animate-pulse'
                                   : ''
                               }`}
                             >
-                              <div className="flex items-center justify-between mb-1.5">
-                                <span className="font-pixel-title text-sm text-[#FFD84D]">
+                              <div className="flex items-center justify-between mb-1 gap-1">
+                                <span className="font-pixel-title text-xs sm:text-sm text-[#FFD84D]">
                                   {item.number}
                                 </span>
-                                <span className="text-[10px] text-white/50">{item.registeredAt}</span>
+                                <span className="text-[9px] text-white/50 shrink-0">{item.registeredAt}</span>
                               </div>
 
-                              <p className="font-bold text-white text-xs mb-3 truncate">
+                              <p className="font-bold text-white text-[11px] sm:text-xs mb-2.5 truncate" title={item.nickname}>
                                 {item.nickname}
                               </p>
 
