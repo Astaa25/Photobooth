@@ -8,8 +8,6 @@ import {
   Shield,
   Sparkles,
   CheckCircle,
-  Play,
-  Pause,
   RotateCcw,
   Film,
   Camera,
@@ -42,10 +40,10 @@ const DEFAULT_GALLERIES: VisitorGalleryItem[] = [
     template: 'NIGHT CITY STRIP 4R',
     accentColor: '#E02F75',
     photos: [
-      { id: 1, color: '#1D4ED8', label: 'Pose 1: Senyum Wisuda' },
-      { id: 2, color: '#BE185D', label: 'Pose 2: Toga & Ijazah' },
-      { id: 3, color: '#047857', label: 'Pose 3: Bersama Sahabat' },
-      { id: 4, color: '#B45309', label: 'Pose 4: Gaya Bebas' },
+      { id: 1, color: '#1D4ED8', label: 'Foto 1' },
+      { id: 2, color: '#BE185D', label: 'Foto 2' },
+      { id: 3, color: '#047857', label: 'Foto 3' },
+      { id: 4, color: '#B45309', label: 'Foto 4' },
     ],
   },
   {
@@ -57,10 +55,10 @@ const DEFAULT_GALLERIES: VisitorGalleryItem[] = [
     template: 'DUO SKYLINE 4R',
     accentColor: '#7226FF',
     photos: [
-      { id: 1, color: '#4338CA', label: 'Pose 1: Berdua Formal' },
-      { id: 2, color: '#DB2777', label: 'Pose 2: Melempar Toga' },
-      { id: 3, color: '#059669', label: 'Pose 3: Ceria Bersama' },
-      { id: 4, color: '#D97706', label: 'Pose 4: Tawa Lepas' },
+      { id: 1, color: '#4338CA', label: 'Foto 1' },
+      { id: 2, color: '#DB2777', label: 'Foto 2' },
+      { id: 3, color: '#059669', label: 'Foto 3' },
+      { id: 4, color: '#D97706', label: 'Foto 4' },
     ],
   },
   {
@@ -72,10 +70,10 @@ const DEFAULT_GALLERIES: VisitorGalleryItem[] = [
     template: 'NIGHT CITY GRID 4R',
     accentColor: '#00E599',
     photos: [
-      { id: 1, color: '#2563EB', label: 'Pose 1: Formasi Tim' },
-      { id: 2, color: '#C026D3', label: 'Pose 2: Jempol TIK' },
-      { id: 3, color: '#16A34A', label: 'Pose 3: Gaya Juara' },
-      { id: 4, color: '#EA580C', label: 'Pose 4: Kompak Bareng' },
+      { id: 1, color: '#2563EB', label: 'Foto 1' },
+      { id: 2, color: '#C026D3', label: 'Foto 2' },
+      { id: 3, color: '#16A34A', label: 'Foto 3' },
+      { id: 4, color: '#EA580C', label: 'Foto 4' },
     ],
   },
   {
@@ -87,10 +85,10 @@ const DEFAULT_GALLERIES: VisitorGalleryItem[] = [
     template: 'MOONLIGHT TRIO 4R',
     accentColor: '#5CE1E6',
     photos: [
-      { id: 1, color: '#3B82F6', label: 'Pose 1: Bunga & Selempang' },
-      { id: 2, color: '#EC4899', label: 'Pose 2: Rangkulan Hangat' },
-      { id: 3, color: '#10B981', label: 'Pose 3: Pose Lensa Depan' },
-      { id: 4, color: '#F59E0B', label: 'Pose 4: Senyum Ceria' },
+      { id: 1, color: '#3B82F6', label: 'Foto 1' },
+      { id: 2, color: '#EC4899', label: 'Foto 2' },
+      { id: 3, color: '#10B981', label: 'Foto 3' },
+      { id: 4, color: '#F59E0B', label: 'Foto 4' },
     ],
   },
   {
@@ -102,10 +100,10 @@ const DEFAULT_GALLERIES: VisitorGalleryItem[] = [
     template: 'NIGHT CITY STRIP 4R',
     accentColor: '#FFD84D',
     photos: [
-      { id: 1, color: '#1E40AF', label: 'Pose 1: Tatap Kamera' },
-      { id: 2, color: '#9D174D', label: 'Pose 2: Salam Dua Jari' },
-      { id: 3, color: '#065F46', label: 'Pose 3: Pelukan Wisuda' },
-      { id: 4, color: '#92400E', label: 'Pose 4: Senyum Lebar' },
+      { id: 1, color: '#1E40AF', label: 'Foto 1' },
+      { id: 2, color: '#9D174D', label: 'Foto 2' },
+      { id: 3, color: '#065F46', label: 'Foto 3' },
+      { id: 4, color: '#92400E', label: 'Foto 4' },
     ],
   },
   {
@@ -117,10 +115,10 @@ const DEFAULT_GALLERIES: VisitorGalleryItem[] = [
     template: 'POSTER TUNGGAL 4R',
     accentColor: '#FE0168',
     photos: [
-      { id: 1, color: '#1E3A8A', label: 'Pose 1: Bersama Ayah & Ibu' },
-      { id: 2, color: '#831843', label: 'Pose 2: Foto Penghormatan' },
-      { id: 3, color: '#064E3B', label: 'Pose 3: Bangga Lulus' },
-      { id: 4, color: '#78350F', label: 'Pose 4: Rangkulan Kasih' },
+      { id: 1, color: '#1E3A8A', label: 'Foto 1' },
+      { id: 2, color: '#831843', label: 'Foto 2' },
+      { id: 3, color: '#064E3B', label: 'Foto 3' },
+      { id: 4, color: '#78350F', label: 'Foto 4' },
     ],
   },
 ];
@@ -133,8 +131,7 @@ export default function GalleryPage() {
   const [downloadSuccess, setDownloadSuccess] = useState(false);
   const [singleDownloadSuccess, setSingleDownloadSuccess] = useState<string | null>(null);
 
-  // Status Pemutar Video Singkat Foto
-  const [isVideoPlaying, setIsVideoPlaying] = useState(true);
+  // Status Pemutar Video Singkat Foto (otomatis berputar tiada henti)
   const [videoFrameIdx, setVideoFrameIdx] = useState(0);
 
   // Ambil data sesi yang tersimpan dari booth jika ada
@@ -153,10 +150,10 @@ export default function GalleryPage() {
             template: item.template || 'NIGHT CITY STRIP 4R',
             accentColor: '#FE0168',
             photos: [
-              { id: 1, color: '#1D4ED8', label: 'Pose 1: Senyum Wisuda' },
-              { id: 2, color: '#BE185D', label: 'Pose 2: Toga & Ijazah' },
-              { id: 3, color: '#047857', label: 'Pose 3: Gaya Kompak' },
-              { id: 4, color: '#B45309', label: 'Pose 4: Pose Akhir' },
+              { id: 1, color: '#1D4ED8', label: 'Foto 1' },
+              { id: 2, color: '#BE185D', label: 'Foto 2' },
+              { id: 3, color: '#047857', label: 'Foto 3' },
+              { id: 4, color: '#B45309', label: 'Foto 4' },
             ],
           }));
 
@@ -169,14 +166,14 @@ export default function GalleryPage() {
     } catch {}
   }, []);
 
-  // Animasi Pemutar Video Singkat Foto (slideshow berkecepatan 1.4 detik per pose)
+  // Animasi Pemutar Video Singkat Foto (slideshow berkecepatan 1.4 detik per pose secara berkelanjutan)
   useEffect(() => {
-    if (!selectedVisitor || !isVideoPlaying) return;
+    if (!selectedVisitor || !selectedVisitor.photos.length) return;
     const interval = setInterval(() => {
       setVideoFrameIdx((prev) => (prev + 1) % selectedVisitor.photos.length);
     }, 1400);
     return () => clearInterval(interval);
-  }, [selectedVisitor, isVideoPlaying]);
+  }, [selectedVisitor]);
 
   // Unduh Satu File Tertentu
   const handleDownloadSingle = (fileName: string) => {
@@ -278,7 +275,6 @@ export default function GalleryPage() {
                 retroAudio.playButtonClick();
                 setSelectedVisitor(visitor);
                 setVideoFrameIdx(0);
-                setIsVideoPlaying(true);
               }}
               className="group cursor-pointer bg-[#0C1230]/95 pixel-box p-5 backdrop-blur hover:bg-[#131947] hover:scale-[1.02] transition-all"
             >
@@ -427,7 +423,7 @@ export default function GalleryPage() {
                       style={{ backgroundColor: selectedVisitor.photos[videoFrameIdx]?.color }}
                     >
                       <span className="bg-black/70 px-3 py-1 font-pixel-title text-xs text-white border border-white/30">
-                        {selectedVisitor.photos[videoFrameIdx]?.label}
+                        {selectedVisitor.photos[videoFrameIdx]?.label || `Foto ${videoFrameIdx + 1}`}
                       </span>
                     </div>
 
@@ -445,23 +441,15 @@ export default function GalleryPage() {
                   {/* Kontrol & Tombol Unduh Video */}
                   <div className="md:col-span-2 flex flex-col justify-between h-full space-y-3">
                     <p className="text-xs text-white/80 leading-relaxed">
-                      Klip video animasi pendek berdurasi 6 detik yang menggabungkan seluruh pose foto dengan transisi arcade retro dan efek shutter kamera.
+                      Klip video animasi pendek berdurasi 6 detik yang menggabungkan seluruh pose foto secara otomatis dengan transisi arcade retro dan efek shutter kamera.
                     </p>
 
-                    <div className="flex flex-wrap items-center gap-3">
-                      <button
-                        onClick={() => setIsVideoPlaying(!isVideoPlaying)}
-                        className="h-10 px-4 pixel-box bg-[#0C1230] hover:bg-[#160078] text-xs font-pixel-title text-[#FFD84D] flex items-center gap-1.5"
-                      >
-                        {isVideoPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-                        <span>{isVideoPlaying ? 'Jeda' : 'Putar'}</span>
-                      </button>
-
+                    <div>
                       <button
                         onClick={() => handleDownloadSingle(`${selectedVisitor.nickname}_Video_Rekap.mp4`)}
-                        className="h-10 px-5 pixel-btn bg-[#E02F75] hover:bg-[#FE0168] text-xs font-pixel-title text-white flex items-center gap-2"
+                        className="h-11 px-6 pixel-btn bg-[#E02F75] hover:bg-[#FE0168] text-xs font-pixel-title text-white flex items-center justify-center gap-2 shadow-[3px_3px_0_0_#050C38]"
                       >
-                        <Download className="w-3.5 h-3.5" />
+                        <Download className="w-4 h-4" />
                         <span>UNDUH VIDEO (MP4)</span>
                       </button>
                     </div>
@@ -527,7 +515,7 @@ export default function GalleryPage() {
                   <div className="flex items-center gap-2">
                     <Camera className="w-5 h-5 text-[#00E599]" />
                     <h3 className="font-pixel-title text-xs sm:text-sm text-[#FFD84D]">
-                      FOTO INDIVIDUAL ASLI (4 POSE TERPISAH)
+                      FOTO INDIVIDUAL ASLI ({selectedVisitor.photos.length} FOTO TERPISAH)
                     </h3>
                   </div>
                   <span className="text-[10px] font-pixel-title bg-[#131947] px-2 py-0.5 text-white/70">
@@ -535,31 +523,31 @@ export default function GalleryPage() {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   {selectedVisitor.photos.map((photo) => (
                     <div
                       key={photo.id}
-                      className="bg-[#131947]/80 border-2 border-[#4B57B2] p-3 flex items-center justify-between gap-3"
+                      className="bg-[#131947]/90 border-2 border-[#4B57B2] p-3 flex items-center justify-between gap-3 shadow-[2px_2px_0_0_#050C38]"
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
                         <div
                           style={{ backgroundColor: photo.color }}
-                          className="w-14 h-12 border border-white/30 flex items-center justify-center font-pixel-title text-xs text-white shrink-0"
+                          className="w-12 h-11 border border-white/30 flex items-center justify-center font-pixel-title text-xs text-white shrink-0"
                         >
                           #{photo.id}
                         </div>
-                        <div>
+                        <div className="min-w-0 flex-1">
                           <p className="font-pixel-title text-xs text-white truncate">
-                            {photo.label}
+                            {photo.label || `Foto ${photo.id}`}
                           </p>
-                          <p className="text-[10px] text-[#5CE1E6]">1920 x 1280 &bull; 2.4 MB</p>
+                          <p className="text-[10px] text-[#5CE1E6] truncate">1920 x 1280 &bull; 2.4 MB</p>
                         </div>
                       </div>
 
                       <button
                         onClick={() => handleDownloadSingle(`${selectedVisitor.nickname}_Foto_${photo.id}.jpg`)}
-                        className="p-2 pixel-box bg-[#050C38] hover:bg-[#E02F75] text-[#5CE1E6] hover:text-white shrink-0"
-                        title={`Unduh ${photo.label}`}
+                        className="w-10 h-10 pixel-box bg-[#050C38] hover:bg-[#E02F75] text-[#5CE1E6] hover:text-white shrink-0 flex items-center justify-center transition-colors"
+                        title={`Unduh ${photo.label || `Foto ${photo.id}`}`}
                       >
                         <Download className="w-4 h-4" />
                       </button>
