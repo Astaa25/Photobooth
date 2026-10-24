@@ -84,47 +84,68 @@ export function PixelPhotoStripDispenser({
                     <div className="grid grid-cols-2 gap-1.5 h-full py-5 px-1.5">
                       {/* Kolom Kiri */}
                       <div className="flex flex-col justify-between gap-1 h-full">
-                        {photos.map((color, idx) => (
-                          <div
-                            key={`left-${idx}`}
-                            style={{ backgroundColor: color }}
-                            className="flex-1 aspect-[16/10] border border-black/40 flex items-center justify-center shadow-inner"
-                          >
-                            <span className="font-pixel-title text-[7px] text-white bg-black/60 px-1 border border-white/20">
-                              POSE #{idx + 1}
-                            </span>
-                          </div>
-                        ))}
+                        {photos.map((color, idx) => {
+                          const isImg = color.startsWith('data:image') || color.startsWith('/') || color.startsWith('http');
+                          return (
+                            <div
+                              key={`left-${idx}`}
+                              style={{ backgroundColor: isImg ? '#000' : color }}
+                              className="flex-1 aspect-[16/10] border border-black/40 flex items-center justify-center shadow-inner overflow-hidden relative"
+                            >
+                              {isImg ? (
+                                <img src={color} alt={`Pose ${idx + 1}`} className="w-full h-full object-cover" />
+                              ) : (
+                                <span className="font-pixel-title text-[7px] text-white bg-black/60 px-1 border border-white/20">
+                                  POSE #{idx + 1}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                       {/* Kolom Kanan (Strip Kembar) */}
                       <div className="flex flex-col justify-between gap-1 h-full">
-                        {photos.map((color, idx) => (
-                          <div
-                            key={`right-${idx}`}
-                            style={{ backgroundColor: color }}
-                            className="flex-1 aspect-[16/10] border border-black/40 flex items-center justify-center shadow-inner"
-                          >
-                            <span className="font-pixel-title text-[7px] text-white bg-black/60 px-1 border border-white/20">
-                              POSE #{idx + 1}
-                            </span>
-                          </div>
-                        ))}
+                        {photos.map((color, idx) => {
+                          const isImg = color.startsWith('data:image') || color.startsWith('/') || color.startsWith('http');
+                          return (
+                            <div
+                              key={`right-${idx}`}
+                              style={{ backgroundColor: isImg ? '#000' : color }}
+                              className="flex-1 aspect-[16/10] border border-black/40 flex items-center justify-center shadow-inner overflow-hidden relative"
+                            >
+                              {isImg ? (
+                                <img src={color} alt={`Pose ${idx + 1}`} className="w-full h-full object-cover" />
+                              ) : (
+                                <span className="font-pixel-title text-[7px] text-white bg-black/60 px-1 border border-white/20">
+                                  POSE #{idx + 1}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   ) : (
                     /* Format Strip Vertikal Bertingkat */
                     <div className="flex flex-col justify-between h-full py-4 px-2 gap-1.5">
-                      {photos.map((color, idx) => (
-                        <div
-                          key={idx}
-                          style={{ backgroundColor: color }}
-                          className="flex-1 border border-black/40 flex items-center justify-center shadow-inner"
-                        >
-                          <span className="font-pixel-title text-[8px] text-white bg-black/60 px-1.5 border border-white/20">
-                            POSE #{idx + 1}
-                          </span>
-                        </div>
-                      ))}
+                      {photos.map((color, idx) => {
+                        const isImg = color.startsWith('data:image') || color.startsWith('/') || color.startsWith('http');
+                        return (
+                          <div
+                            key={idx}
+                            style={{ backgroundColor: isImg ? '#000' : color }}
+                            className="flex-1 border border-black/40 flex items-center justify-center shadow-inner overflow-hidden relative"
+                          >
+                            {isImg ? (
+                              <img src={color} alt={`Pose ${idx + 1}`} className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="font-pixel-title text-[8px] text-white bg-black/60 px-1.5 border border-white/20">
+                                POSE #{idx + 1}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

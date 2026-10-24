@@ -1,6 +1,5 @@
-'use client';
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Camera, Laptop } from 'lucide-react';
 
 interface PixelCameraViewfinderProps {
   countdownNum: number;
@@ -8,6 +7,9 @@ interface PixelCameraViewfinderProps {
   totalPhotos: number;
   isRetake?: boolean;
   cameraName?: string;
+  cameraSource?: 'canon' | 'webcam';
+  onSwitchCamera?: (source: 'canon' | 'webcam') => void;
+  onSnapshotCapture?: (dataUrl: string) => void;
 }
 
 export function PixelCameraViewfinder({
@@ -16,8 +18,13 @@ export function PixelCameraViewfinder({
   totalPhotos,
   isRetake = false,
   cameraName = 'CANON EOS 1200D',
+  cameraSource = 'canon',
+  onSwitchCamera,
+  onSnapshotCapture,
 }: PixelCameraViewfinderProps) {
   const [vuLevel, setVuLevel] = useState(3);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [hasWebcamStream, setHasWebcamStream] = useState(false);
 
   // Efek simulasi level audio VU meter 8-bit
   useEffect(() => {
@@ -27,8 +34,75 @@ export function PixelCameraViewfinder({
     return () => clearInterval(interval);
   }, []);
 
+  // Aktifkan feed video jika sumber kamera adalah kamera laptop (webcam)
+  useEffect(() => {
+    let mediaStream: MediaStream | null = null;
+    if (cameraSource === 'webcam') {
+      if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+        navigator.mediaDevices
+          .getUserMedia({ video: { facingMode: 'user', width: 1280, height: 720 } })
+          .then((stream) => {
+            mediaStream = stream;
+            if (videoRef.current) {
+              videoRef.current.srcObject = stream;
+              setHasWebcamStream(true);
+            }
+          })
+          .catch(() => {
+            setHasWebcamStream(false);
+          });
+      }
+    } else {
+      setHasWebcamStream(false);
+    }
+
+    return () => {
+      if (mediaStream) {
+        mediaStream.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, [cameraSource]);
+
+  // Ambil snapshot foto dari video webcam saat countdown mencapai 0
+  useEffect(() => {
+    if (countdownNum === 0 && cameraSource === 'webcam' && onSnapshotCapture && videoRef.current) {
+      try {
+        const video = videoRef.current;
+        if (video.videoWidth > 0 && video.videoHeight > 0) {
+          const canvas = document.createElement('canvas');
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+            onSnapshotCapture(dataUrl);
+          }
+        }
+      } catch (err) {
+        console.error('Error capturing webcam photo:', err);
+      }
+    }
+  }, [countdownNum, cameraSource, onSnapshotCapture]);
+
+  const activeDeviceLabel = cameraSource === 'webcam' ? 'KAMERA LAPTOP (WEBCAM)' : cameraName;
+
   return (
     <div className="relative w-full aspect-[4/3] max-w-2xl mx-auto bg-black/85 pixel-box border-4 border-[#4B57B2] flex flex-col items-center justify-center overflow-hidden select-none font-pixel">
+      {/* 0. Live Video Feed dari Kamera Laptop (Jika Mode Webcam Aktif) */}
+      {cameraSource === 'webcam' && (
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className={`absolute inset-0 w-full h-full object-cover scale-x-[-1] z-0 transition-opacity duration-300 ${
+            hasWebcamStream ? 'opacity-90' : 'opacity-0'
+          }`}
+        />
+      )}
       {/* 1. Efek Garis Scanline CRT TV Retro */}
       <div
         className="absolute inset-0 pointer-events-none opacity-20 z-10"
@@ -78,9 +152,9 @@ export function PixelCameraViewfinder({
       </div>
 
       {/* 5. Telemetri HUD Atas */}
-      <div className="absolute top-5 left-16 right-16 flex items-center justify-between text-[11px] font-pixel-title z-10 pointer-events-none">
+      <div className="absolute top-4 left-6 right-6 flex items-center justify-between text-[11px] font-pixel-title z-10 pointer-events-none">
         {/* Status Rekam Merah */}
-        <div className="flex items-center gap-2 bg-[#0C1230]/80 px-2.5 py-1 border border-[#4B57B2]">
+        <div className="flex items-center gap-2 bg-[#0C1230]/85 px-2.5 py-1 border border-[#4B57B2]">
           <span className="w-2.5 h-2.5 bg-[#FE0168] rounded-none animate-pulse" />
           <span className="text-[#FE0168]">REC</span>
           <span className="text-white/60">●</span>
@@ -92,10 +166,40 @@ export function PixelCameraViewfinder({
           {isRetake ? `ULANGI FOTO #${currentPhotoIdx + 1} (1X)` : `FOTO ${currentPhotoIdx + 1}/${totalPhotos}`}
         </div>
 
-        {/* Baterai & Perangkat */}
-        <div className="flex items-center gap-2 bg-[#0C1230]/80 px-2.5 py-1 border border-[#4B57B2] text-[#00E599]">
-          <span>{cameraName}</span>
-          <span className="text-white/80">[■■■■]</span>
+        {/* Baterai & Perangkat + Tombol Switch */}
+        <div className="flex items-center gap-2">
+          {onSwitchCamera && (
+            <button
+              type="button"
+              onClick={() => onSwitchCamera(cameraSource === 'canon' ? 'webcam' : 'canon')}
+              className="pointer-events-auto px-2 py-1 bg-[#160078] hover:bg-[#E02F75] text-[#FFD84D] border border-[#FFD84D]/60 flex items-center gap-1.5 transition-colors shadow-sm"
+              title="Ganti Sumber Kamera"
+            >
+              {cameraSource === 'webcam' ? (
+                <>
+                  <Camera className="w-3 h-3 text-[#00E599]" />
+                  <span className="text-[9px]">GANTI: CANON</span>
+                </>
+              ) : (
+                <>
+                  <Laptop className="w-3 h-3 text-[#5CE1E6]" />
+                  <span className="text-[9px]">GANTI: LAPTOP</span>
+                </>
+              )}
+            </button>
+          )}
+
+          <div className="flex items-center gap-2 bg-[#0C1230]/85 px-2.5 py-1 border border-[#4B57B2]">
+            {cameraSource === 'webcam' ? (
+              <Laptop className="w-3 h-3 text-[#5CE1E6]" />
+            ) : (
+              <Camera className="w-3 h-3 text-[#00E599]" />
+            )}
+            <span className={cameraSource === 'webcam' ? 'text-[#5CE1E6]' : 'text-[#00E599]'}>
+              {activeDeviceLabel}
+            </span>
+            <span className="text-white/80">[■■■■]</span>
+          </div>
         </div>
       </div>
 
@@ -110,13 +214,13 @@ export function PixelCameraViewfinder({
       </div>
 
       {/* 7. Baris Status Bawah: ISO, Shutter, & Audio Meter */}
-      <div className="absolute bottom-5 left-16 right-16 flex items-center justify-between text-[10px] font-pixel-title text-[#A9B8FF] z-10 pointer-events-none">
-        <div className="bg-[#0C1230]/80 px-2.5 py-1 border border-[#4B57B2]">
-          ISO 400 &bull; F/2.8 &bull; 1/125s
+      <div className="absolute bottom-4 left-6 right-6 flex items-center justify-between text-[10px] font-pixel-title text-[#A9B8FF] z-10 pointer-events-none">
+        <div className="bg-[#0C1230]/85 px-2.5 py-1 border border-[#4B57B2]">
+          {cameraSource === 'webcam' ? 'WEBCAM HD • 30 FPS • AUTO EXPOSURE' : 'ISO 400 • F/2.8 • 1/125s'}
         </div>
 
         {/* Bar VU Meter 8-Bit */}
-        <div className="flex items-center gap-1 bg-[#0C1230]/80 px-2.5 py-1 border border-[#4B57B2]">
+        <div className="flex items-center gap-1 bg-[#0C1230]/85 px-2.5 py-1 border border-[#4B57B2]">
           <span className="text-white/60">MIC:</span>
           {[1, 2, 3, 4, 5].map((lvl) => (
             <span
@@ -134,8 +238,8 @@ export function PixelCameraViewfinder({
           ))}
         </div>
 
-        <div className="bg-[#0C1230]/80 px-2.5 py-1 border border-[#4B57B2] text-[#FFD84D]">
-          RAW+JPEG 4R
+        <div className="bg-[#0C1230]/85 px-2.5 py-1 border border-[#4B57B2] text-[#FFD84D]">
+          {cameraSource === 'webcam' ? '720P RGB' : 'RAW+JPEG 4R'}
         </div>
       </div>
     </div>

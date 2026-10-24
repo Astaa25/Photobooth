@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import {
   Camera,
+  Laptop,
   RotateCcw,
   Check,
   Sparkles,
@@ -100,6 +101,8 @@ export default function BoothKioskPage() {
   const [retakeIndex, setRetakeIndex] = useState<number | null>(null);
   const [capturedPhotos, setCapturedPhotos] = useState<string[]>([]);
   const [isFlashActive, setIsFlashActive] = useState(false);
+  const [cameraSource, setCameraSource] = useState<'canon' | 'webcam'>('canon');
+  const latestWebcamSnapshotRef = useRef<string | null>(null);
 
   // Periksa apakah tablet sudah diaktifkan di sesi browser ini
   useEffect(() => {
@@ -108,8 +111,25 @@ export default function BoothKioskPage() {
       if (saved === 'true') {
         setIsUnlocked(true);
       }
+      try {
+        const savedCam = localStorage.getItem('photobooth_selected_camera');
+        if (savedCam === 'canon' || savedCam === 'webcam') {
+          setCameraSource(savedCam);
+        }
+      } catch {}
     }
   }, []);
+
+  // Ganti sumber kamera dan broadcast ke jendela admin
+  const handleSwitchCamera = (source: 'canon' | 'webcam') => {
+    setCameraSource(source);
+    try {
+      localStorage.setItem('photobooth_selected_camera', source);
+      const channel = new BroadcastChannel('photobooth_session_sync');
+      channel.postMessage({ type: 'CAMERA_CHANGED', cameraSource: source });
+      channel.close();
+    } catch {}
+  };
 
   // Sinkronisasi Sesi Aktif & Desain Bingkai dengan Admin Dashboard secara Real-Time
   useEffect(() => {
@@ -155,6 +175,10 @@ export default function BoothKioskPage() {
             }
           }
         }
+        const savedCam = localStorage.getItem('photobooth_selected_camera');
+        if (savedCam === 'canon' || savedCam === 'webcam') {
+          setCameraSource(savedCam);
+        }
       } catch {}
     };
 
@@ -178,6 +202,11 @@ export default function BoothKioskPage() {
           setCapturedPhotos([]);
         } else if (event.data?.type === 'TEMPLATES_UPDATED') {
           loadTemplates();
+        } else if (
+          event.data?.type === 'CAMERA_CHANGED' &&
+          (event.data.cameraSource === 'canon' || event.data.cameraSource === 'webcam')
+        ) {
+          setCameraSource(event.data.cameraSource);
         }
       };
     } catch {}
@@ -263,10 +292,15 @@ export default function BoothKioskPage() {
             ];
             const oldColor = capturedPhotos[retakeIndex];
             const pool = newPalette.filter((c) => c !== oldColor);
-            const freshColor = pool[Math.floor(Math.random() * pool.length)] || newPalette[0];
+            const fallbackColor = pool[Math.floor(Math.random() * pool.length)] || newPalette[0];
+            const photoData =
+              cameraSource === 'webcam' && latestWebcamSnapshotRef.current
+                ? latestWebcamSnapshotRef.current
+                : fallbackColor;
+            latestWebcamSnapshotRef.current = null;
 
             const updated = [...capturedPhotos];
-            updated[retakeIndex] = freshColor;
+            updated[retakeIndex] = photoData;
 
             // Pastikan panjang array tetap pas sejumlah template photoCount
             setCapturedPhotos(updated.slice(0, selectedTemplate.photoCount));
@@ -278,7 +312,14 @@ export default function BoothKioskPage() {
 
           // 2. KASUS NORMAL (JEPRET BERURUTAN DARI 0 SAMPAI photoCount)
           const colors = ['#1D4ED8', '#BE185D', '#047857', '#B45309', '#7C3AED', '#DB2777'];
-          const newPhotos = [...capturedPhotos, colors[currentPhotoIdx % colors.length]];
+          const fallbackColor = colors[currentPhotoIdx % colors.length];
+          const photoData =
+            cameraSource === 'webcam' && latestWebcamSnapshotRef.current
+              ? latestWebcamSnapshotRef.current
+              : fallbackColor;
+          latestWebcamSnapshotRef.current = null;
+
+          const newPhotos = [...capturedPhotos, photoData];
           setCapturedPhotos(newPhotos.slice(0, selectedTemplate.photoCount));
 
           if (currentPhotoIdx + 1 < selectedTemplate.photoCount) {
@@ -293,7 +334,7 @@ export default function BoothKioskPage() {
       }
     }
     return () => clearTimeout(timer);
-  }, [step, countdownNum, currentPhotoIdx, capturedPhotos, selectedTemplate.photoCount, soundEnabled, retakeIndex]);
+  }, [step, countdownNum, currentPhotoIdx, capturedPhotos, selectedTemplate.photoCount, soundEnabled, retakeIndex, cameraSource]);
 
   const startCapture = () => {
     if (soundEnabled) retroAudio.playButtonClick();
@@ -562,6 +603,29 @@ export default function BoothKioskPage() {
             </span>
           )}
 
+          {/* Tombol Opsi Sumber Kamera (Canon DSLR vs Laptop Webcam) */}
+          <button
+            type="button"
+            onClick={() => {
+              if (soundEnabled) retroAudio.playButtonClick();
+              handleSwitchCamera(cameraSource === 'canon' ? 'webcam' : 'canon');
+            }}
+            className="flex items-center gap-1.5 px-2.5 py-1 bg-[#131947] hover:bg-[#160078] border-2 border-[#4B57B2] text-[11px] font-pixel-title transition-colors"
+            title="Ganti Sumber Kamera (Canon DSLR vs Laptop Webcam)"
+          >
+            {cameraSource === 'webcam' ? (
+              <>
+                <Laptop className="w-3.5 h-3.5 text-[#5CE1E6]" />
+                <span className="text-[#5CE1E6]">KAMERA: LAPTOP</span>
+              </>
+            ) : (
+              <>
+                <Camera className="w-3.5 h-3.5 text-[#00E599]" />
+                <span className="text-[#00E599]">KAMERA: CANON 1200D</span>
+              </>
+            )}
+          </button>
+
           <button
             onClick={() => {
               setSoundEnabled(!soundEnabled);
@@ -726,6 +790,11 @@ export default function BoothKioskPage() {
             totalPhotos={retakeIndex !== null ? 1 : selectedTemplate.photoCount}
             isRetake={retakeIndex !== null}
             cameraName="CANON 1200D"
+            cameraSource={cameraSource}
+            onSwitchCamera={handleSwitchCamera}
+            onSnapshotCapture={(dataUrl) => {
+              latestWebcamSnapshotRef.current = dataUrl;
+            }}
           />
         )}
 
@@ -742,23 +811,30 @@ export default function BoothKioskPage() {
             </p>
 
             <div className="flex flex-wrap items-center justify-center gap-4 mb-6">
-              {capturedPhotos.slice(0, selectedTemplate.photoCount).map((color, idx) => (
-                <div key={idx} className="relative group">
-                  <div
-                    style={{ backgroundColor: color }}
-                    className="w-36 h-28 border-4 border-[#4B57B2] flex flex-col items-center justify-center font-pixel-title text-xs text-white shadow-[4px_4px_0_0_#050C38]"
-                  >
-                    FOTO #{idx + 1}
+              {capturedPhotos.slice(0, selectedTemplate.photoCount).map((color, idx) => {
+                const isImg = color.startsWith('data:image') || color.startsWith('/') || color.startsWith('http');
+                return (
+                  <div key={idx} className="relative group">
+                    <div
+                      style={{ backgroundColor: isImg ? '#000' : color }}
+                      className="w-36 h-28 border-4 border-[#4B57B2] overflow-hidden flex flex-col items-center justify-center font-pixel-title text-xs text-white shadow-[4px_4px_0_0_#050C38] relative"
+                    >
+                      {isImg ? (
+                        <img src={color} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
+                      ) : (
+                        <span>FOTO #{idx + 1}</span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => retakeSingle(idx)}
+                      className="mt-2 w-full py-1.5 pixel-btn bg-[#6700A3] hover:bg-[#E02F75] text-[10px] text-white font-bold flex items-center justify-center gap-1 shadow-sm"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      <span>ULANGI</span>
+                    </button>
                   </div>
-                  <button
-                    onClick={() => retakeSingle(idx)}
-                    className="mt-2 w-full py-1.5 pixel-btn bg-[#6700A3] hover:bg-[#E02F75] text-[10px] text-white font-bold flex items-center justify-center gap-1 shadow-sm"
-                  >
-                    <RotateCcw className="w-3 h-3" />
-                    <span>ULANGI</span>
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <button

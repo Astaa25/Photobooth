@@ -19,6 +19,7 @@ import {
   Eye,
   LogOut,
   Camera,
+  Laptop,
   Volume2,
   VolumeX,
   Sparkles,
@@ -184,6 +185,11 @@ export default function AdminDashboardPage() {
   const [newCatTitle, setNewCatTitle] = useState('');
   const [newCatColor, setNewCatColor] = useState('#5CE1E6');
 
+  // State Sumber Kamera (DSLR Canon EOS 1200D vs Kamera Laptop HD Webcam)
+  const [activeCamera, setActiveCamera] = useState<'canon' | 'webcam'>('canon');
+  const [webcamTestActive, setWebcamTestActive] = useState(false);
+  const adminWebcamVideoRef = useRef<HTMLVideoElement | null>(null);
+
   // 1. Muat Kategori & Template Kustom dari Server & LocalStorage
   useEffect(() => {
     try {
@@ -191,6 +197,10 @@ export default function AdminDashboardPage() {
       if (savedCats) {
         const parsed = JSON.parse(savedCats);
         if (Array.isArray(parsed) && parsed.length > 0) setCategories(parsed);
+      }
+      const savedCam = localStorage.getItem('photobooth_selected_camera');
+      if (savedCam === 'canon' || savedCam === 'webcam') {
+        setActiveCamera(savedCam);
       }
     } catch {}
 
@@ -245,6 +255,14 @@ export default function AdminDashboardPage() {
           if (soundEnabled) retroAudio.playSuccessChime();
           showToast(`Antrean baru masuk: ${newItem.nickname} (${newItem.number})`);
         }
+
+        // Sinyal perubahan kamera aktif dari bilik booth
+        if (
+          event.data?.type === 'CAMERA_CHANGED' &&
+          (event.data.cameraSource === 'canon' || event.data.cameraSource === 'webcam')
+        ) {
+          setActiveCamera(event.data.cameraSource);
+        }
       };
     } catch {}
 
@@ -252,6 +270,50 @@ export default function AdminDashboardPage() {
       if (channel) channel.close();
     };
   }, [soundEnabled]);
+
+  // Live stream preview kamera laptop di tab Hardware admin
+  useEffect(() => {
+    let stream: MediaStream | null = null;
+    if (webcamTestActive) {
+      if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+        navigator.mediaDevices
+          .getUserMedia({ video: { facingMode: 'user', width: 640, height: 480 } })
+          .then((s) => {
+            stream = s;
+            if (adminWebcamVideoRef.current) {
+              adminWebcamVideoRef.current.srcObject = s;
+            }
+          })
+          .catch(() => {
+            setWebcamTestActive(false);
+            showToast('Tidak dapat mengakses kamera laptop (Izin ditolak atau tidak ada webcam).');
+          });
+      }
+    }
+
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach((t) => t.stop());
+      }
+    };
+  }, [webcamTestActive]);
+
+  // Handler Ganti Sumber Kamera Aktif
+  const handleSelectCamera = (source: 'canon' | 'webcam') => {
+    setActiveCamera(source);
+    try {
+      localStorage.setItem('photobooth_selected_camera', source);
+      const channel = new BroadcastChannel('photobooth_session_sync');
+      channel.postMessage({ type: 'CAMERA_CHANGED', cameraSource: source });
+      channel.close();
+    } catch {}
+    if (soundEnabled) retroAudio.playButtonClick();
+    showToast(
+      `Kamera aktif bilik booth diubah ke: ${
+        source === 'canon' ? 'Canon EOS 1200D DSLR (USB)' : 'Kamera Laptop (Integrated HD Webcam)'
+      }`
+    );
+  };
 
   // 3. Heartbeat Auto-Refresh Berkelanjutan (Selalu Loading & Sinkron Setiap 2.5 Detik)
   useEffect(() => {
@@ -673,7 +735,7 @@ export default function AdminDashboardPage() {
               }`}
             >
               <Camera className="w-4 h-4 text-[#00E599]" />
-              <span>HARDWARE &bull; 1200D/L300</span>
+              <span>HARDWARE &bull; KAMERA &amp; PRINTER</span>
             </button>
           </nav>
 
@@ -1577,56 +1639,229 @@ export default function AdminDashboardPage() {
               TAB 4: MONITOR HARDWARE (CANON EOS 1200D & EPSON L300)
               ================================================================= */}
           {activeTab === 'hardware' && (
-            <div className="max-w-4xl mx-auto space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-[#0C1230]/95 pixel-box p-6">
-                  <div className="flex items-center gap-2 text-xs font-pixel-title text-[#FFD84D] mb-4">
-                    <PixelCameraIcon size={20} />
-                    <span>KAMERA: CANON EOS 1200D DSLR</span>
+            <div className="max-w-5xl mx-auto space-y-6">
+              {/* 1. Selector Sumber Kamera Utama Bilik Booth */}
+              <div className="bg-[#0C1230]/95 pixel-box p-5 border-2 border-[#5CE1E6]">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-[#4B57B2]/50">
+                  <div>
+                    <h3 className="font-pixel-title text-sm text-[#FFD84D] flex items-center gap-2">
+                      <Camera className="w-4 h-4 text-[#5CE1E6]" />
+                      <span>PILIH SUMBER KAMERA UTAMA BILIK BOOTH</span>
+                    </h3>
+                    <p className="text-[11px] text-[#A9B8FF] mt-1">
+                      Kamera yang dipilih di sini akan langsung digunakan secara real-time di layar bilik booth tablet/laptop.
+                    </p>
                   </div>
-                  <div className="p-3 bg-[#050C38] border-2 border-[#00E599] text-[#00E599] font-pixel-title text-xs mb-4 flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 bg-[#00E599] animate-pulse" />
-                    <span>STATUS: TERHUBUNG VIA USB (ONLINE)</span>
+                  <div className="flex items-center gap-2 px-3 py-1 bg-[#131947] border border-[#00E599] text-[#00E599] text-[10px] font-pixel-title shrink-0">
+                    <span className="w-2 h-2 bg-[#00E599] animate-pulse" />
+                    <span>AKTIF: {activeCamera === 'canon' ? 'CANON EOS 1200D' : 'KAMERA LAPTOP'}</span>
                   </div>
-                  <ul className="text-xs text-white/70 space-y-2 mb-6">
-                    <li>&bull; Pengambilan: RAW + High Quality JPEG</li>
-                    <li>&bull; Eksposur: Shutter 1/125s &bull; ISO 400 &bull; f/2.8</li>
-                    <li>&bull; Auto-detect jika kamera berganti perangkat</li>
-                  </ul>
-                  <button
-                    onClick={() => {
-                      retroAudio.playShutterSound();
-                      showToast('Test shutter kamera Canon EOS 1200D berhasil!');
-                    }}
-                    className="w-full h-11 pixel-btn bg-[#049A5C] hover:bg-[#00E599] text-white text-xs font-pixel-title font-bold"
-                  >
-                    TEST SHUTTER KAMERA
-                  </button>
                 </div>
 
-                <div className="bg-[#0C1230]/95 pixel-box p-6">
-                  <div className="flex items-center gap-2 text-xs font-pixel-title text-[#5CE1E6] mb-4">
-                    <PixelPrinterIcon size={20} />
-                    <span>PRINTER: EPSON L300 SERIES</span>
-                  </div>
-                  <div className="p-3 bg-[#050C38] border-2 border-[#5CE1E6] text-[#5CE1E6] font-pixel-title text-xs mb-4 flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 bg-[#5CE1E6] animate-pulse" />
-                    <span>SPOOLER: READY (KERTAS 4R GLOSSY)</span>
-                  </div>
-                  <ul className="text-xs text-white/70 space-y-2 mb-6">
-                    <li>&bull; Ukuran Cetak: 4R (10 x 15 cm / 1200 x 1800 px)</li>
-                    <li>&bull; Resolusi: 300 DPI Borderless</li>
-                    <li>&bull; Tarif per lembar: Rp15.000</li>
-                  </ul>
+                {/* Tombol Pilihan Kamera */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Opsi 1: Canon DSLR */}
                   <button
-                    onClick={() => {
-                      retroAudio.playPrintSound();
-                      showToast('Test feed printer Epson L300 berhasil!');
-                    }}
-                    className="w-full h-11 pixel-btn bg-[#6700A3] hover:bg-[#7226FF] text-white text-xs font-pixel-title font-bold"
+                    type="button"
+                    onClick={() => handleSelectCamera('canon')}
+                    className={`p-4 pixel-box text-left transition-all flex items-start gap-3.5 ${
+                      activeCamera === 'canon'
+                        ? 'bg-[#160078] border-2 border-[#00E599] shadow-[0_0_15px_rgba(0,229,153,0.3)]'
+                        : 'bg-[#131947]/70 border border-[#4B57B2] hover:bg-[#131947]'
+                    }`}
                   >
-                    TEST CETAK LEMBAR 4R
+                    <div className="p-2.5 bg-[#0C1230] border border-[#00E599] text-[#00E599] shrink-0">
+                      <PixelCameraIcon size={24} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-pixel-title text-xs text-[#FFD84D]">CANON EOS 1200D DSLR</span>
+                        {activeCamera === 'canon' && (
+                          <span className="text-[9px] font-pixel-title bg-[#00E599] text-[#050C38] px-1.5 py-0.5 font-bold">
+                            ★ AKTIF DI BOOTH
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-white/70">
+                        Kamera eksternal profesional via kabel USB. Sensor 18MP APS-C untuk hasil foto jernih resolusi tinggi.
+                      </p>
+                    </div>
                   </button>
+
+                  {/* Opsi 2: Kamera Laptop HD */}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectCamera('webcam')}
+                    className={`p-4 pixel-box text-left transition-all flex items-start gap-3.5 ${
+                      activeCamera === 'webcam'
+                        ? 'bg-[#160078] border-2 border-[#5CE1E6] shadow-[0_0_15px_rgba(92,225,230,0.3)]'
+                        : 'bg-[#131947]/70 border border-[#4B57B2] hover:bg-[#131947]'
+                    }`}
+                  >
+                    <div className="p-2.5 bg-[#0C1230] border border-[#5CE1E6] text-[#5CE1E6] shrink-0">
+                      <Laptop className="w-6 h-6" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-pixel-title text-xs text-[#FFD84D]">KAMERA LAPTOP (HD WEBCAM)</span>
+                        {activeCamera === 'webcam' && (
+                          <span className="text-[9px] font-pixel-title bg-[#5CE1E6] text-[#050C38] px-1.5 py-0.5 font-bold">
+                            ★ AKTIF DI BOOTH
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-white/70">
+                        Webcam terintegrasi laptop (WebRTC). Siap langsung berfoto tanpa kabel tambahan atau driver DSLR.
+                      </p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* 2. Kartu Rincian Hardware */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                {/* Kartu 1: DSLR Canon EOS 1200D */}
+                <div className="bg-[#0C1230]/95 pixel-box p-5 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 text-xs font-pixel-title text-[#FFD84D] mb-3">
+                      <PixelCameraIcon size={20} />
+                      <span className="truncate">CANON EOS 1200D DSLR</span>
+                    </div>
+                    <div className="p-2.5 bg-[#050C38] border-2 border-[#00E599] text-[#00E599] font-pixel-title text-[10px] mb-3 flex items-center gap-2">
+                      <span className="w-2 h-2 bg-[#00E599] animate-pulse" />
+                      <span>STATUS: ONLINE (USB)</span>
+                    </div>
+                    <ul className="text-[11px] text-white/70 space-y-1.5 mb-4">
+                      <li>&bull; Mode: RAW + High Quality JPEG</li>
+                      <li>&bull; Eksposur: Shutter 1/125s &bull; ISO 400</li>
+                      <li>&bull; Lensa: EF-S 18-55mm IS II</li>
+                      <li>&bull; Shutter Cable: Sync Otomatis</li>
+                    </ul>
+                  </div>
+
+                  <div className="space-y-2 pt-2 border-t border-[#4B57B2]/40">
+                    {activeCamera !== 'canon' ? (
+                      <button
+                        type="button"
+                        onClick={() => handleSelectCamera('canon')}
+                        className="w-full py-2 pixel-btn bg-[#160078] hover:bg-[#6700A3] text-[#FFD84D] text-[10px] font-pixel-title font-bold"
+                      >
+                        AKTIFKAN KAMERA INI
+                      </button>
+                    ) : (
+                      <div className="w-full py-1.5 bg-[#00E599]/20 border border-[#00E599] text-[#00E599] text-[10px] font-pixel-title text-center">
+                        ✓ KAMERA BOOTH AKTIF
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        retroAudio.playShutterSound();
+                        showToast('Test shutter Canon EOS 1200D berhasil!');
+                      }}
+                      className="w-full py-2 pixel-btn bg-[#049A5C] hover:bg-[#00E599] text-white text-[10px] font-pixel-title font-bold"
+                    >
+                      TEST SHUTTER CANON
+                    </button>
+                  </div>
+                </div>
+
+                {/* Kartu 2: Kamera Laptop (Webcam HD) */}
+                <div className="bg-[#0C1230]/95 pixel-box p-5 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 text-xs font-pixel-title text-[#5CE1E6] mb-3">
+                      <Laptop className="w-5 h-5 text-[#5CE1E6]" />
+                      <span className="truncate">KAMERA LAPTOP HD</span>
+                    </div>
+                    <div className="p-2.5 bg-[#050C38] border-2 border-[#5CE1E6] text-[#5CE1E6] font-pixel-title text-[10px] mb-3 flex items-center gap-2">
+                      <span className="w-2 h-2 bg-[#5CE1E6] animate-pulse" />
+                      <span>STATUS: WEBRTC READY</span>
+                    </div>
+                    <ul className="text-[11px] text-white/70 space-y-1.5 mb-4">
+                      <li>&bull; Sensor: Integrated HD Camera</li>
+                      <li>&bull; Resolusi: 1280x720 (720p 30 FPS)</li>
+                      <li>&bull; Shutter: Web Canvas Snapshot</li>
+                      <li>&bull; Live Feed: Langsung di Bilik Booth</li>
+                    </ul>
+
+                    {/* Pratinjau Mini Live Feed Webcam Admin */}
+                    {webcamTestActive && (
+                      <div className="relative aspect-video w-full bg-black border-2 border-[#5CE1E6] mb-3 overflow-hidden">
+                        <video
+                          ref={adminWebcamVideoRef}
+                          autoPlay
+                          playsInline
+                          muted
+                          className="w-full h-full object-cover scale-x-[-1]"
+                        />
+                        <div className="absolute top-1 left-1 bg-black/70 text-[#00E599] px-1 text-[8px] font-pixel-title">
+                          LIVE TEST
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2 pt-2 border-t border-[#4B57B2]/40">
+                    {activeCamera !== 'webcam' ? (
+                      <button
+                        type="button"
+                        onClick={() => handleSelectCamera('webcam')}
+                        className="w-full py-2 pixel-btn bg-[#160078] hover:bg-[#6700A3] text-[#5CE1E6] text-[10px] font-pixel-title font-bold"
+                      >
+                        AKTIFKAN KAMERA INI
+                      </button>
+                    ) : (
+                      <div className="w-full py-1.5 bg-[#5CE1E6]/20 border border-[#5CE1E6] text-[#5CE1E6] text-[10px] font-pixel-title text-center">
+                        ✓ KAMERA BOOTH AKTIF
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setWebcamTestActive(!webcamTestActive);
+                        if (!webcamTestActive) {
+                          retroAudio.playButtonClick();
+                          showToast('Membuka live feed kamera laptop...');
+                        }
+                      }}
+                      className="w-full py-2 pixel-btn bg-[#160078] hover:bg-[#5CE1E6] hover:text-[#050C38] text-white text-[10px] font-pixel-title font-bold"
+                    >
+                      {webcamTestActive ? 'TUTUP UJI WEBCAM' : 'UJI LIVE FEED WEBCAM'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Kartu 3: Printer Epson L300 Series */}
+                <div className="bg-[#0C1230]/95 pixel-box p-5 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 text-xs font-pixel-title text-[#FFD84D] mb-3">
+                      <PixelPrinterIcon size={20} />
+                      <span className="truncate">EPSON L300 SERIES</span>
+                    </div>
+                    <div className="p-2.5 bg-[#050C38] border-2 border-[#00E599] text-[#00E599] font-pixel-title text-[10px] mb-3 flex items-center gap-2">
+                      <span className="w-2 h-2 bg-[#00E599] animate-pulse" />
+                      <span>SPOOLER: READY (4R)</span>
+                    </div>
+                    <ul className="text-[11px] text-white/70 space-y-1.5 mb-4">
+                      <li>&bull; Ukuran Kertas: 4R (10 x 15 cm)</li>
+                      <li>&bull; Resolusi: 300 DPI Borderless</li>
+                      <li>&bull; Tinta: Epson 664 4-Color Original</li>
+                      <li>&bull; Tarif per lembar: Rp15.000</li>
+                    </ul>
+                  </div>
+
+                  <div className="pt-2 border-t border-[#4B57B2]/40">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        retroAudio.playPrintSound();
+                        showToast('Test feed printer Epson L300 berhasil!');
+                      }}
+                      className="w-full py-2 pixel-btn bg-[#6700A3] hover:bg-[#7226FF] text-white text-[10px] font-pixel-title font-bold"
+                    >
+                      TEST CETAK LEMBAR 4R
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1636,7 +1871,9 @@ export default function AdminDashboardPage() {
         {/* Footer Sub-Bar Seimbang di Bawah */}
         <footer className="h-10 bg-[#0C1230]/90 border-t-2 border-[#4B57B2] px-6 flex items-center justify-between text-[10px] text-[#A9B8FF] shrink-0 font-pixel">
           <div className="flex items-center gap-4">
-            <span className="text-[#00E599]">CANON 1200D: OK</span>
+            <span className={activeCamera === 'canon' ? 'text-[#00E599]' : 'text-[#5CE1E6]'}>
+              KAMERA BOOTH: {activeCamera === 'canon' ? 'CANON 1200D DSLR (AKTIF)' : 'KAMERA LAPTOP HD (AKTIF)'}
+            </span>
             <span className="text-white/20">|</span>
             <span className="text-[#5CE1E6]">EPSON L300: READY (4R)</span>
             <span className="text-white/20">|</span>
