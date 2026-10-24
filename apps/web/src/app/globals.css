@@ -1,0 +1,78 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Warna (StyleGuide.md) */
+  --ink: #12151A;
+  --ink-soft: #3A404A;
+  --film: #8B929E;
+  --sheet: #E4E6EA;
+  --paper: #F6F6F4;
+  --paper-raised: #FFFFFF;
+  --ultramarine: #2438D9;
+  --ultramarine-press: #1B2CB0;
+  --ultramarine-wash: #E8EBFC;
+  --flash: #FFD84D;
+  --signal-ok: #1F7A4F;
+  --signal-warn: #A86400;
+  --signal-bad: #B42318;
+
+  /* Sistem Gerak & Easing (StyleGuide.md) */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* Durasi */
+  --dur-instant: 90ms;
+  --dur-fast: 160ms;
+  --dur-base: 220ms;
+  --dur-slow: 320ms;
+  --dur-scene: 520ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0E1116;
+    --paper-raised: #171B22;
+    --ink: #F2F3F5;
+    --ink-soft: #A2A8B5;
+    --sheet: #2A303C;
+    --film: #6E7684;
+    --ultramarine-wash: #1E284A;
+  }
+}
+
+body {
+  background-color: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tabular figures untuk angka antrean dan harga */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Interaksi tekan tombol */
+.btn-press {
+  transition: transform var(--dur-instant) var(--ease-out), background-color var(--dur-fast) var(--ease-out);
+}
+.btn-press:active {
+  transform: scale(0.97);
+}
+
+/* Dukungan reduced motion (StyleGuide.md aturan 12) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

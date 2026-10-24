@@ -1,0 +1,23 @@
+{
+  "name": "photobooth-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "doctor": "tsx scripts/doctor.ts",
+    "secrets:generate": "tsx scripts/generate-secrets.ts",
+    "dev": "pnpm --filter @photobooth/server --filter @photobooth/web dev",
+    "build": "pnpm -r run build",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/node": "^22.13.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.4"
+  }
+}
