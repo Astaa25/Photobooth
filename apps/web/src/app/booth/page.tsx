@@ -36,6 +36,8 @@ interface TemplateOption {
   desc: string;
   photoCount: number;
   previewType: 'strip' | 'grid' | 'trio' | 'duo' | 'single';
+  frameImage?: string;
+  isCustom?: boolean;
 }
 
 const TEMPLATES: TemplateOption[] = [
@@ -45,6 +47,7 @@ const TEMPLATES: TemplateOption[] = [
     desc: 'Dua strip 4 foto (gaya photobooth)',
     photoCount: 4,
     previewType: 'strip',
+    frameImage: '/assets/frames/night-city-strip.png',
   },
   {
     slug: 'night-city-grid',
@@ -52,6 +55,7 @@ const TEMPLATES: TemplateOption[] = [
     desc: '4 foto dalam kisi 2x2',
     photoCount: 4,
     previewType: 'grid',
+    frameImage: '/assets/frames/night-city-grid.png',
   },
   {
     slug: 'moonlight-trio',
@@ -59,6 +63,7 @@ const TEMPLATES: TemplateOption[] = [
     desc: '3 foto strip dengan bulan sabit',
     photoCount: 3,
     previewType: 'trio',
+    frameImage: '/assets/frames/moonlight-trio.png',
   },
   {
     slug: 'duo-skyline',
@@ -66,6 +71,7 @@ const TEMPLATES: TemplateOption[] = [
     desc: '2 foto bertingkat untuk berdua',
     photoCount: 2,
     previewType: 'duo',
+    frameImage: '/assets/frames/duo-skyline.png',
   },
   {
     slug: 'poster-tunggal',
@@ -73,6 +79,7 @@ const TEMPLATES: TemplateOption[] = [
     desc: '1 foto besar bergaya poster expo',
     photoCount: 1,
     previewType: 'single',
+    frameImage: '/assets/frames/poster-tunggal.png',
   },
 ];
 
@@ -107,8 +114,17 @@ export default function BoothKioskPage() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Muat template kustom dari admin jika ada
-    const loadTemplates = () => {
+    // Muat template kustom dari server /api/frames atau fallback localStorage
+    const loadTemplates = async () => {
+      try {
+        const res = await fetch('/api/frames');
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          setTemplates(json.data);
+          return;
+        }
+      } catch {}
+
       try {
         const raw = localStorage.getItem('photobooth_custom_templates');
         if (raw) {
@@ -302,9 +318,21 @@ export default function BoothKioskPage() {
     setCapturedPhotos([]);
   };
 
-  // Mini preview layout pixel untuk kartu template
-  const renderTemplateMiniPreview = (type: TemplateOption['previewType']) => {
-    switch (type) {
+  // Mini preview layout pixel untuk kartu template (menampilkan gambar frame asli PNG jika ada)
+  const renderTemplateMiniPreview = (tpl: TemplateOption) => {
+    if (tpl.frameImage) {
+      return (
+        <div className="w-12 h-16 bg-black/80 border-2 border-[#5CE1E6] overflow-hidden flex items-center justify-center relative shadow-sm shrink-0">
+          <img
+            src={tpl.frameImage}
+            alt={tpl.name}
+            className="w-full h-full object-contain pixel-art"
+          />
+        </div>
+      );
+    }
+
+    switch (tpl.previewType) {
       case 'strip':
         return (
           <div className="w-10 h-14 bg-black/60 border border-[#5CE1E6] p-0.5 flex gap-0.5">
@@ -613,7 +641,7 @@ export default function BoothKioskPage() {
               Pilih tata letak bingkai cetak favoritmu (kompatibel kertas foto 4R 1200x1800).
             </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-6 max-h-[58vh] overflow-y-auto pr-1">
               {templates.map((tpl) => (
                 <button
                   key={tpl.slug}
@@ -621,26 +649,31 @@ export default function BoothKioskPage() {
                     if (soundEnabled) retroAudio.playButtonClick();
                     setSelectedTemplate(tpl);
                   }}
-                  className={`p-3.5 text-left border-4 transition-all flex items-start gap-3 pixel-art ${
+                  className={`p-3 text-left border-4 transition-all flex items-start gap-3 pixel-art relative ${
                     selectedTemplate.slug === tpl.slug
                       ? 'border-[#E02F75] bg-[#6700A3]/60 shadow-[0_0_12px_#E02F75]'
                       : 'border-[#4B57B2] bg-[#131947]/70 hover:border-white/50'
                   }`}
                 >
                   <div className="flex-shrink-0">
-                    {renderTemplateMiniPreview(tpl.previewType)}
+                    {renderTemplateMiniPreview(tpl)}
                   </div>
 
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-pixel-title text-[11px] text-[#FFD84D] leading-tight">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1 gap-1">
+                      <span className="font-pixel-title text-[11px] text-[#FFD84D] leading-tight truncate">
                         {tpl.name}
                       </span>
+                      {tpl.isCustom && (
+                        <span className="text-[7px] font-pixel-title bg-[#E02F75] px-1 py-0.5 text-white border border-[#FFD84D] shrink-0">
+                          CUSTOM
+                        </span>
+                      )}
                     </div>
                     <span className="text-[9px] font-pixel-title bg-black/60 px-1.5 py-0.5 text-[#5CE1E6] border border-white/20 inline-block mb-1">
                       {tpl.photoCount}X JEPRET
                     </span>
-                    <p className="text-[11px] text-white/70 leading-snug">{tpl.desc}</p>
+                    <p className="text-[11px] text-white/70 leading-snug line-clamp-2">{tpl.desc}</p>
                   </div>
                 </button>
               ))}
@@ -725,6 +758,7 @@ export default function BoothKioskPage() {
             ticketNumber={ticketNumber || '#001'}
             photos={capturedPhotos.length > 0 ? capturedPhotos : ['#1D4ED8', '#BE185D', '#047857', '#B45309']}
             templateName={selectedTemplate.name}
+            frameImage={selectedTemplate.frameImage}
             onReset={handleFinishSession}
           />
         )}

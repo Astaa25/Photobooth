@@ -164,7 +164,7 @@ export default function AdminDashboardPage() {
   const [newCatTitle, setNewCatTitle] = useState('');
   const [newCatColor, setNewCatColor] = useState('#5CE1E6');
 
-  // 1. Muat Kategori & Template Kustom dari LocalStorage
+  // 1. Muat Kategori & Template Kustom dari Server & LocalStorage
   useEffect(() => {
     try {
       const savedCats = localStorage.getItem('photobooth_kanban_categories');
@@ -172,15 +172,27 @@ export default function AdminDashboardPage() {
         const parsed = JSON.parse(savedCats);
         if (Array.isArray(parsed) && parsed.length > 0) setCategories(parsed);
       }
-
-      const savedTemplates = localStorage.getItem('photobooth_custom_templates');
-      if (savedTemplates) {
-        const parsed = JSON.parse(savedTemplates);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setTemplates([...DEFAULT_TEMPLATES, ...parsed]);
-        }
-      }
     } catch {}
+
+    // Muat template dari API server /api/frames
+    fetch('/api/frames')
+      .then((res) => res.json())
+      .then((res) => {
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setTemplates(res.data);
+        }
+      })
+      .catch(() => {
+        try {
+          const savedTemplates = localStorage.getItem('photobooth_custom_templates');
+          if (savedTemplates) {
+            const parsed = JSON.parse(savedTemplates);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setTemplates([...DEFAULT_TEMPLATES, ...parsed]);
+            }
+          }
+        } catch {}
+      });
   }, []);
 
   // 2. Dengarkan sinyal dari bilik booth tablet & pendaftaran baru
@@ -328,53 +340,107 @@ export default function AdminDashboardPage() {
   };
 
   // Tambah Desain Frame Baru
-  const handleSaveFrame = (e: React.FormEvent) => {
+  const handleSaveFrame = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!frameName.trim()) {
       showToast('Nama frame wajib diisi.');
       return;
     }
 
-    const slug = `custom-${Date.now()}`;
-    const newFrame: CustomTemplate = {
-      slug,
+    const payload = {
       name: frameName.trim().toUpperCase(),
       desc: frameDesc.trim() || `${frameCount} foto 4R kustom`,
       photoCount: frameCount,
       previewType: frameLayout,
+      frameImageBase64: uploadedFramePreview || '/assets/frames/night-city-strip.png',
+    };
+
+    try {
+      const res = await fetch('/api/frames', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (data.success && data.all) {
+        setTemplates(data.all);
+        try {
+          const customOnly = data.all.filter((t: any) => t.isCustom);
+          localStorage.setItem('photobooth_custom_templates', JSON.stringify(customOnly));
+        } catch {}
+
+        const channel = new BroadcastChannel('photobooth_session_sync');
+        channel.postMessage({ type: 'TEMPLATES_UPDATED' });
+        channel.close();
+
+        if (soundEnabled) retroAudio.playSuccessChime();
+        showToast(`Frame "${payload.name}" berhasil disimpan dan aktif di bilik booth!`);
+
+        // Reset input
+        setFrameName('');
+        setFrameDesc('');
+        setUploadedFramePreview(null);
+        return;
+      }
+    } catch {}
+
+    // Fallback lokal jika fetch gagal
+    const slug = `custom-${Date.now()}`;
+    const newFrame: CustomTemplate = {
+      slug,
+      name: payload.name,
+      desc: payload.desc,
+      photoCount: payload.photoCount,
+      previewType: payload.previewType,
       frameImage: uploadedFramePreview || '/assets/frames/night-city-strip.png',
       isCustom: true,
     };
-
     const updated = [...templates, newFrame];
     setTemplates(updated);
 
     try {
       const customOnly = updated.filter((t) => t.isCustom);
       localStorage.setItem('photobooth_custom_templates', JSON.stringify(customOnly));
-
       const channel = new BroadcastChannel('photobooth_session_sync');
       channel.postMessage({ type: 'TEMPLATES_UPDATED' });
       channel.close();
     } catch {}
 
     if (soundEnabled) retroAudio.playSuccessChime();
-    showToast(`Frame "${newFrame.name}" berhasil disimpan dan aktif di bilik booth!`);
-
-    // Reset input
+    showToast(`Frame "${newFrame.name}" berhasil disimpan!`);
     setFrameName('');
     setFrameDesc('');
     setUploadedFramePreview(null);
   };
 
   // Hapus Frame Kustom
-  const handleDeleteFrame = (slug: string) => {
+  const handleDeleteFrame = async (slug: string) => {
+    try {
+      const res = await fetch(`/api/frames?slug=${encodeURIComponent(slug)}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (data.success && data.all) {
+        setTemplates(data.all);
+        try {
+          const customOnly = data.all.filter((t: any) => t.isCustom);
+          localStorage.setItem('photobooth_custom_templates', JSON.stringify(customOnly));
+        } catch {}
+
+        const channel = new BroadcastChannel('photobooth_session_sync');
+        channel.postMessage({ type: 'TEMPLATES_UPDATED' });
+        channel.close();
+
+        showToast('Desain frame kustom dihapus.');
+        return;
+      }
+    } catch {}
+
     const updated = templates.filter((t) => t.slug !== slug);
     setTemplates(updated);
     try {
       const customOnly = updated.filter((t) => t.isCustom);
       localStorage.setItem('photobooth_custom_templates', JSON.stringify(customOnly));
-
       const channel = new BroadcastChannel('photobooth_session_sync');
       channel.postMessage({ type: 'TEMPLATES_UPDATED' });
       channel.close();

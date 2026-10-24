@@ -10,6 +10,7 @@ interface PixelPhotoStripDispenserProps {
   ticketNumber: string;
   photos: string[];
   templateName: string;
+  frameImage?: string;
   onReset: () => void;
 }
 
@@ -18,6 +19,7 @@ export function PixelPhotoStripDispenser({
   ticketNumber,
   photos,
   templateName,
+  frameImage,
   onReset,
 }: PixelPhotoStripDispenserProps) {
   const [dispensed, setDispensed] = useState(false);
@@ -68,12 +70,21 @@ export function PixelPhotoStripDispenser({
 
           {/* Kertas Foto Strip 4R yang Meluncur Keluar */}
           <div
-            className={`w-64 bg-gradient-to-b from-[#0C1230] to-[#160078] border-4 border-[#E02F75] p-3 shadow-[6px_6px_0_0_rgba(5,12,56,0.8)] transition-all duration-1000 ease-out -mt-1 relative z-10 ${
+            className={`w-64 bg-gradient-to-b from-[#0C1230] to-[#160078] border-4 border-[#E02F75] p-3 shadow-[6px_6px_0_0_rgba(5,12,56,0.8)] transition-all duration-1000 ease-out -mt-1 relative z-10 overflow-hidden ${
               dispensed ? 'translate-y-0 opacity-100' : '-translate-y-12 opacity-30'
             }`}
           >
+            {/* Frame PNG Overlay Kustom jika ada */}
+            {frameImage && (
+              <img
+                src={frameImage}
+                alt="Frame Overlay"
+                className="absolute inset-0 w-full h-full object-fill pointer-events-none z-20 opacity-90 pixel-art"
+              />
+            )}
+
             {/* Header Strip Foto */}
-            <div className="text-center pb-2 mb-2 border-b-2 border-dashed border-[#5CE1E6]/40">
+            <div className="text-center pb-2 mb-2 border-b-2 border-dashed border-[#5CE1E6]/40 relative z-10">
               <div className="flex items-center justify-center gap-1 text-[#FFD84D] mb-0.5">
                 <PixelCrossStar size={8} />
                 <span className="font-pixel-title text-[8px] tracking-wider">
@@ -87,7 +98,7 @@ export function PixelPhotoStripDispenser({
             </div>
 
             {/* Bingkai Foto Pengunjung (Tersusun Vertikal) */}
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 relative z-10">
               {photos.map((photoColor, idx) => (
                 <div
                   key={idx}
@@ -110,7 +121,7 @@ export function PixelPhotoStripDispenser({
             </div>
 
             {/* Footer Strip Foto: Info Pengunjung, Tanggal */}
-            <div className="mt-2 pt-2 border-t-2 border-dashed border-[#5CE1E6]/40 flex items-center justify-between text-[8px] font-pixel-title">
+            <div className="mt-2 pt-2 border-t-2 border-dashed border-[#5CE1E6]/40 flex items-center justify-between text-[8px] font-pixel-title relative z-10">
               <div className="text-left">
                 <span className="text-[#FFD84D] block">{visitorName}</span>
                 <span className="text-[#5CE1E6] block">{ticketNumber}</span>
