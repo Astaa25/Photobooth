@@ -78,29 +78,24 @@ export default function HomePage() {
           </span>
         </Link>
 
-        {/* Kartu 4: Status Perangkat Keras */}
-        <div className="p-6 bg-paper-raised border border-sheet rounded-panel shadow-raise-1">
-          <div className="w-12 h-12 rounded-btn bg-sheet text-ink flex items-center justify-center mb-5">
+        {/* Kartu 4: Layar Tablet / Kios Booth */}
+        <Link
+          href="/booth"
+          className="group block p-6 bg-paper-raised border border-sheet rounded-panel shadow-raise-1 hover:shadow-raise-2 transition-all btn-press"
+        >
+          <div className="w-12 h-12 rounded-btn bg-[#FFD84D] text-ink flex items-center justify-center mb-5">
             <Camera className="w-6 h-6" />
           </div>
           <h2 className="font-display text-xl font-bold text-ink mb-2">
-            Driver &amp; Perangkat
+            Layar Booth (Tablet Kiosk)
           </h2>
-          <ul className="text-xs text-ink-soft space-y-2 mt-3">
-            <li className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-signal-ok" />
-              <span>Camera Driver: Canon EOS (Mode Mock aktif, 1920x1280 JPEG)</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-signal-ok" />
-              <span>Printer Driver: SumatraPDF 4R (102 x 152 mm borderless)</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-signal-ok" />
-              <span>Template Engine: 5 Template 4R terpasang (Sharp)</span>
-            </li>
-          </ul>
-        </div>
+          <p className="text-ink-soft text-sm leading-relaxed mb-4">
+            Buka di tablet Android apa pun via browser (fullscreen). Alur jepret 3-2-1, flash, retake foto, dan QR galeri.
+          </p>
+          <span className="text-ink font-medium text-sm group-hover:underline">
+            Buka Layar Kios Booth &rarr;
+          </span>
+        </Link>
       </div>
 
       {/* Footer Info */}

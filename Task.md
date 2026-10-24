@@ -11,14 +11,14 @@ Aturan khusus fase pertama: semua konfigurasi dan uji perangkat keras diselesaik
 Tujuan: semua hal yang berada di luar kode sudah diputuskan dan terpasang.
 
 ### 0.1 Keputusan (catat di `TECHSTACK.md` bagian "Keputusan yang dikunci")
-- [ ] Sistem operasi laptop
-- [ ] Model kamera Canon dan metode kendali (`digicamcontrol` atau `gphoto2`)
-- [ ] Model printer dan ukuran kertas 4R
-- [ ] Model tablet dan versi Android
-- [ ] Mode akses pengunjung: `tunnel` atau `lan-http`
-- [ ] Mode galeri: `local` atau `cloud`
-- [ ] Metode pembayaran yang dicatat operator
-- [ ] Kebijakan retensi data (hari setelah acara) dan masa berlaku tautan galeri
+- [x] Sistem operasi laptop (Windows 10/11)
+- [x] Model kamera Canon dan metode kendali (Canon 1200D & Adaptif via `digicamcontrol` / `webcam` / `mock`)
+- [x] Model printer dan ukuran kertas 4R (Epson L300 & Universal Windows Driver 4R)
+- [x] Model tablet dan antarmuka (Universal Tablet Android & Web Kiosk)
+- [x] Mode akses pengunjung: `lan-http` & Cloudflare Tunnel gratis
+- [x] Mode galeri: `local` (gratis)
+- [x] Metode pembayaran yang dicatat operator (Tunai & QRIS statis)
+- [x] Kebijakan retensi data dan masa berlaku tautan galeri (30 hari)
 
 ### 0.2 Perangkat lunak di laptop
 - [ ] Git, Node.js LTS, pnpm

@@ -58,15 +58,16 @@ Isi seluruhnya sebelum Fase 2. Tanpa ini tidak ada fitur yang dikerjakan.
 
 | Keputusan | Pilihan | Catatan |
 |---|---|---|
-| OS laptop | (default: Windows 10 atau 11) | digiCamControl hanya Windows |
-| Model kamera Canon | | Cek dukungan Live View dan kendali jarak jauh |
-| Metode kendali kamera | | `digicamcontrol`, `gphoto2` |
-| Model printer dan profil kertas | | Profil 4R tanpa tepi dan hasil cetak uji |
-| Model tablet dan versi Android | | Mode kios, layar tetap menyala |
-| Mode akses pengunjung | `tunnel` atau `lan-http` | `tunnel` direkomendasikan, perlu internet |
-| Mode galeri | `local` atau `cloud` | Mengubahnya nanti butuh migrasi berkas |
-| Pembayaran | tunai, QRIS statis, transfer | Operator mencatat. Gateway otomatis ditunda |
-| Jumlah booth | 1 | Skema sudah siap multi booth |
+| OS laptop | Windows 10/11 | Driver digiCamControl & SumatraPDF native Windows |
+| Model kamera | Canon EOS 1200D & Adaptif (Multi-driver) | Mendukung Canon 1200D (digiCamControl), webcam, dan mock |
+| Metode kendali kamera | `digicamcontrol`, `webcam`, `mock` | Gratis (FOSS). Ganti kamera tidak merusak sistem |
+| Model printer | Epson L300 Series & Universal | Cetak via Windows Print Spooler / SumatraPDF (gratis) |
+| Model tablet | Tablet Android & Web Kiosk | Mode kios responsif, kompatibel segala ukuran layar/tablet |
+| Mode akses pengunjung | `lan-http` & `tunnel` (Cloudflare gratis) | Bebas biaya domain/hosting; bisa lokal tanpa internet |
+| Mode galeri | `local` (gratis) | Penyimpanan lokal laptop / Supabase Storage gratis |
+| Pembayaran | Tunai & QRIS Statis | Operator mencatat manual, 0% potongan biaya gateway |
+| Database | Supabase (PostgreSQL gratis) | Drizzle ORM, kompatibel PostgreSQL lokal & Supabase cloud |
+| Jumlah booth | 1 | Skema database sudah mendukung multi-booth |
 
 Catatan teknis kamera: dummy battery LP-E10 dan kabel mini USB menunjuk ke keluarga EOS seri 1100D sampai 4000D, tetapi model pasti harus diverifikasi sebelum diasumsikan. Dummy battery hanya menyuplai daya, tidak mengirim foto. EOS Utility dan aplikasi Canon lain harus ditutup karena menguasai kamera.
 
