@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Image from 'next/image';
-import { Sparkles, Download, Check, QrCode } from 'lucide-react';
+import { Sparkles, Download, Check, QrCode, ArrowDown } from 'lucide-react';
 import { PixelCrossStar } from './PixelPosterDecorations';
+import { PixelPrinterIcon } from './PixelIcons';
 
 interface PixelPhotoStripDispenserProps {
   visitorName: string;
@@ -31,103 +31,137 @@ export function PixelPhotoStripDispenser({
   }, []);
 
   return (
-    <div className="flex flex-col items-center justify-center w-full max-w-lg mx-auto font-pixel select-none animate-fadeIn">
-      {/* 1. Rumah Slot Dispenser Arcade (Metal Bevel & Garis Hazard) */}
-      <div className="w-full max-w-sm bg-[#1C2140] border-4 border-[#050C38] shadow-[0_8px_0_0_#050C38] p-3 text-center relative z-20">
-        {/* Garis Hazard Kuning-Hitam */}
-        <div
-          className="w-full h-3 mb-2 border border-black/40"
-          style={{
-            backgroundImage:
-              'repeating-linear-gradient(45deg, #FFD84D, #FFD84D 8px, #050C38 8px, #050C38 16px)',
-          }}
-        />
-
-        <div className="flex items-center justify-between text-[10px] font-pixel-title text-[#FFD84D] px-1">
-          <span>DISPENSER STRIP 4R</span>
-          <span className="flex items-center gap-1 text-[#00E599]">
-            <span className="w-2 h-2 bg-[#00E599] animate-pulse" />
-            READY
-          </span>
-        </div>
-
-        {/* Celah Pengeluaran Kertas Foto (Hitam Pekat) */}
-        <div className="w-full h-3 bg-black mt-2 border-t-2 border-b-2 border-[#4B57B2] relative overflow-hidden" />
+    <div className="flex flex-col items-center justify-center w-full max-w-4xl mx-auto font-pixel select-none animate-fadeIn py-2">
+      {/* Petunjuk Gulir jika di layar vertikal kecil */}
+      <div className="lg:hidden flex items-center gap-1.5 text-[10px] font-pixel-title text-[#FFD84D] mb-3 animate-bounce">
+        <ArrowDown className="w-3.5 h-3.5" />
+        <span>GULIR KE BAWAH UNTUK QR &amp; TOMBOL SELESAI</span>
+        <ArrowDown className="w-3.5 h-3.5" />
       </div>
 
-      {/* 2. Kertas Foto Strip 4R yang Meluncur Keluar (Stepped Pixel Animation) */}
-      <div
-        className={`w-72 bg-gradient-to-b from-[#0C1230] to-[#160078] border-4 border-[#E02F75] p-3.5 shadow-[8px_8px_0_0_rgba(5,12,56,0.8)] transition-all duration-1000 ease-out -mt-1 relative z-10 ${
-          dispensed ? 'translate-y-0 opacity-100' : '-translate-y-16 opacity-30'
-        }`}
-      >
-        {/* Header Strip Foto */}
-        <div className="text-center pb-2.5 mb-2.5 border-b-2 border-dashed border-[#5CE1E6]/40">
-          <div className="flex items-center justify-center gap-1.5 text-[#FFD84D] mb-1">
-            <PixelCrossStar size={10} />
-            <span className="font-pixel-title text-[9px] tracking-wider">
-              EXPO WISUDA TIK 2026
-            </span>
-            <PixelCrossStar size={10} />
-          </div>
-          <p className="text-[10px] text-white/80 font-pixel-title">
-            POLITEKNIK NEGERI LHOKSEUMAWE
-          </p>
-        </div>
-
-        {/* Bingkai Foto Pengunjung (Tersusun Vertikal) */}
-        <div className="space-y-2">
-          {photos.map((photoColor, idx) => (
+      {/* Kontainer Fleksibel: Bersebelahan di Landscape / Layar Lebar, Menumpuk di Portrait */}
+      <div className="flex flex-col lg:flex-row items-center lg:items-start justify-center gap-8 w-full">
+        {/* Kolom Kiri: Mesin Dispenser & Kertas Strip 4R */}
+        <div className="flex flex-col items-center w-full max-w-xs">
+          {/* Rumah Slot Dispenser Arcade */}
+          <div className="w-full bg-[#1C2140] border-4 border-[#050C38] shadow-[0_6px_0_0_#050C38] p-2.5 text-center relative z-20">
+            {/* Garis Hazard Kuning-Hitam */}
             <div
-              key={idx}
-              className="relative w-full aspect-[4/3] border-2 border-white/20 bg-black/60 overflow-hidden flex items-center justify-center group"
-            >
-              {/* Latar Foto atau Warna Foto */}
-              <div
-                className="w-full h-full flex flex-col items-center justify-center p-2"
-                style={{ backgroundColor: photoColor }}
-              >
-                <div className="bg-black/50 px-2 py-1 font-pixel-title text-[10px] text-white border border-white/30">
-                  POSE #{idx + 1}
-                </div>
-              </div>
+              className="w-full h-2.5 mb-1.5 border border-black/40"
+              style={{
+                backgroundImage:
+                  'repeating-linear-gradient(45deg, #FFD84D, #FFD84D 8px, #050C38 8px, #050C38 16px)',
+              }}
+            />
 
-              {/* Timestamp & Watermark di Sudut Foto */}
-              <div className="absolute bottom-1 right-1.5 text-[8px] font-pixel-title text-white/90 bg-black/60 px-1">
-                TIK2026
-              </div>
+            <div className="flex items-center justify-between text-[9px] font-pixel-title text-[#FFD84D] px-1">
+              <span>DISPENSER 4R</span>
+              <span className="flex items-center gap-1 text-[#00E599]">
+                <span className="w-2 h-2 bg-[#00E599] animate-pulse" />
+                PRINT READY
+              </span>
             </div>
-          ))}
-        </div>
 
-        {/* Footer Strip Foto: Info Pengunjung, Tanggal, & Mini QR Code */}
-        <div className="mt-3 pt-2.5 border-t-2 border-dashed border-[#5CE1E6]/40 flex items-center justify-between text-[9px] font-pixel-title">
-          <div className="text-left">
-            <span className="text-[#FFD84D] block">{visitorName}</span>
-            <span className="text-[#5CE1E6] block">{ticketNumber}</span>
-            <span className="text-white/50 text-[8px] block">24 OKTOBER 2026</span>
+            {/* Celah Pengeluaran Kertas Foto */}
+            <div className="w-full h-2.5 bg-black mt-1.5 border-t-2 border-b-2 border-[#4B57B2] relative overflow-hidden" />
           </div>
 
-          <div className="w-10 h-10 bg-white p-0.5 border border-[#4B57B2] flex items-center justify-center">
-            <QrCode className="w-8 h-8 text-black" />
+          {/* Kertas Foto Strip 4R yang Meluncur Keluar */}
+          <div
+            className={`w-64 bg-gradient-to-b from-[#0C1230] to-[#160078] border-4 border-[#E02F75] p-3 shadow-[6px_6px_0_0_rgba(5,12,56,0.8)] transition-all duration-1000 ease-out -mt-1 relative z-10 ${
+              dispensed ? 'translate-y-0 opacity-100' : '-translate-y-12 opacity-30'
+            }`}
+          >
+            {/* Header Strip Foto */}
+            <div className="text-center pb-2 mb-2 border-b-2 border-dashed border-[#5CE1E6]/40">
+              <div className="flex items-center justify-center gap-1 text-[#FFD84D] mb-0.5">
+                <PixelCrossStar size={8} />
+                <span className="font-pixel-title text-[8px] tracking-wider">
+                  EXPO WISUDA TIK 2026
+                </span>
+                <PixelCrossStar size={8} />
+              </div>
+              <p className="text-[9px] text-white/80 font-pixel-title">
+                POLITEKNIK NEGERI LHOKSEUMAWE
+              </p>
+            </div>
+
+            {/* Bingkai Foto Pengunjung (Tersusun Vertikal) */}
+            <div className="space-y-1.5">
+              {photos.map((photoColor, idx) => (
+                <div
+                  key={idx}
+                  className="relative w-full aspect-[16/10] border-2 border-white/20 bg-black/60 overflow-hidden flex items-center justify-center"
+                >
+                  <div
+                    className="w-full h-full flex flex-col items-center justify-center p-1"
+                    style={{ backgroundColor: photoColor }}
+                  >
+                    <div className="bg-black/60 px-2 py-0.5 font-pixel-title text-[9px] text-white border border-white/30">
+                      POSE #{idx + 1}
+                    </div>
+                  </div>
+
+                  <div className="absolute bottom-0.5 right-1 text-[7px] font-pixel-title text-white/90 bg-black/70 px-1">
+                    TIK2026
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Footer Strip Foto: Info Pengunjung, Tanggal */}
+            <div className="mt-2 pt-2 border-t-2 border-dashed border-[#5CE1E6]/40 flex items-center justify-between text-[8px] font-pixel-title">
+              <div className="text-left">
+                <span className="text-[#FFD84D] block">{visitorName}</span>
+                <span className="text-[#5CE1E6] block">{ticketNumber}</span>
+                <span className="text-white/50 text-[7px] block">24 OKT 2026</span>
+              </div>
+              <span className="text-[7px] text-white/60 bg-black/40 px-1 py-0.5 border border-white/20">
+                {templateName}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Kolom Kanan: Kartu QR Code Unduh Digital & Tombol Selesai */}
+        <div className="w-full max-w-sm flex flex-col items-center">
+          <div className="w-full bg-[#0C1230]/95 pixel-box-cyber p-6 text-center backdrop-blur">
+            <div className="w-12 h-12 mx-auto pixel-box bg-[#049A5C] text-white flex items-center justify-center mb-3">
+              <Sparkles className="w-6 h-6 text-[#FFD84D]" />
+            </div>
+
+            <h2 className="font-pixel-title text-sm text-[#FFD84D] mb-1.5 leading-relaxed">
+              FOTO BERHASIL DISIMPAN!
+            </h2>
+            <p className="text-xs text-[#A9B8FF] mb-4">
+              Pindai QR Code di bawah dengan ponsel Anda untuk membuka galeri dan mengunduh seluruh file foto digital gratis.
+            </p>
+
+            {/* Kotak QR Code Pixel */}
+            <div className="w-44 h-44 mx-auto bg-white p-3 pixel-box flex items-center justify-center mb-4">
+              <QrCode className="w-36 h-36 text-black" />
+            </div>
+
+            <p className="font-pixel-title text-[10px] text-[#5CE1E6] mb-5">
+              TIKET: <span className="text-[#FFD84D]">{ticketNumber}</span> &bull; {visitorName}
+            </p>
+
+            {/* Tombol Selesai yang Jelas dan Mudah Ditekan */}
+            <button
+              onClick={onReset}
+              className="w-full h-14 pixel-btn bg-[#049A5C] hover:bg-[#00E599] text-white font-pixel-title text-xs tracking-wider flex items-center justify-center gap-2"
+            >
+              <Check className="w-5 h-5 text-white" />
+              <span>SELESAI &bull; KEMBALI KE STANDBY</span>
+            </button>
+          </div>
+
+          <div className="mt-4 p-3 bg-[#131947]/90 pixel-box text-center text-[10px] font-pixel-title text-[#FFD84D] flex items-center justify-center gap-2 w-full">
+            <PixelPrinterIcon size={16} />
+            <span>AMBIL CETAKAN 4R DI MEJA OPERATOR</span>
           </div>
         </div>
       </div>
-
-      {/* 3. Panel Aksi Pengunjung di Bawah */}
-      <div className="mt-6 flex flex-col sm:flex-row items-center gap-3 w-full max-w-sm">
-        <button
-          onClick={onReset}
-          className="w-full h-12 pixel-btn bg-[#049A5C] hover:bg-[#00E599] text-white text-xs font-bold flex items-center justify-center gap-2"
-        >
-          <Check className="w-4 h-4" />
-          <span>SELESAI &bull; KEMBALI</span>
-        </button>
-      </div>
-
-      <p className="font-pixel-title text-[10px] text-[#FFD84D] mt-3 animate-pulse text-center">
-        ★ SILAKAN AMBIL HASIL CETAK 4R DI MEJA OPERATOR ★
-      </p>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
@@ -50,6 +50,30 @@ export default function AdminDashboardPage() {
   const [printingItem, setPrintingItem] = useState<QueueItem | null>(null);
   const [printCopies, setPrintCopies] = useState<number>(2);
 
+  // Dengarkan sinyal selesai dari bilik booth tablet
+  useEffect(() => {
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('photobooth_session_sync');
+      channel.onmessage = (event) => {
+        if (event.data?.type === 'SESSION_COMPLETED') {
+          const tNum = event.data.ticketNumber;
+          setQueue((prev) =>
+            prev.map((item) =>
+              item.number === tNum ? { ...item, status: QueueStatus.DONE } : item
+            )
+          );
+          if (soundEnabled) retroAudio.playCoinSound();
+          showToast(`Sesi foto untuk ${event.data.visitorName || tNum} telah selesai!`);
+        }
+      };
+    } catch {}
+
+    return () => {
+      if (channel) channel.close();
+    };
+  }, [soundEnabled]);
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
@@ -63,6 +87,33 @@ export default function AdminDashboardPage() {
         retroAudio.playButtonClick();
       }
     }
+
+    const targetItem = queue.find((q) => q.id === id);
+
+    // Sinkronkan ke bilik booth tablet secara real-time
+    try {
+      const channel = new BroadcastChannel('photobooth_session_sync');
+      if (newStatus === QueueStatus.IN_SESSION && targetItem) {
+        channel.postMessage({
+          type: 'START_SESSION',
+          visitorName: targetItem.nickname,
+          ticketNumber: targetItem.number,
+        });
+        localStorage.setItem(
+          'photobooth_active_session',
+          JSON.stringify({
+            visitorName: targetItem.nickname,
+            ticketNumber: targetItem.number,
+            timestamp: Date.now(),
+          })
+        );
+      } else if (newStatus === QueueStatus.DONE || newStatus === QueueStatus.WAITING) {
+        channel.postMessage({ type: 'RESET_TO_STANDBY' });
+        localStorage.removeItem('photobooth_active_session');
+      }
+      channel.close();
+    } catch {}
+
     setQueue((prev) =>
       prev.map((item) => (item.id === id ? { ...item, status: newStatus } : item))
     );

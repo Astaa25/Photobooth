@@ -12,6 +12,8 @@ import {
   Maximize,
   Volume2,
   VolumeX,
+  Hourglass,
+  Radio,
 } from 'lucide-react';
 import { retroAudio } from '@/utils/audio';
 import {
@@ -26,7 +28,7 @@ import {
 import { PixelCameraViewfinder } from '@/components/pixel/PixelCameraViewfinder';
 import { PixelPhotoStripDispenser } from '@/components/pixel/PixelPhotoStripDispenser';
 
-type BoothStep = 'welcome' | 'choosing_design' | 'countdown' | 'flash' | 'review' | 'result';
+type BoothStep = 'standby' | 'welcome' | 'choosing_design' | 'countdown' | 'flash' | 'review' | 'result';
 
 interface TemplateOption {
   slug: string;
@@ -80,10 +82,11 @@ export default function BoothKioskPage() {
   const [pinError, setPinError] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
 
-  const [step, setStep] = useState<BoothStep>('welcome');
+  // Status alur booth: standby (tunggu admin) atau tahap foto
+  const [step, setStep] = useState<BoothStep>('standby');
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateOption>(TEMPLATES[0]);
-  const [visitorName, setVisitorName] = useState('DIANA');
-  const [ticketNumber, setTicketNumber] = useState('#020');
+  const [visitorName, setVisitorName] = useState('');
+  const [ticketNumber, setTicketNumber] = useState('');
   const [countdownNum, setCountdownNum] = useState(3);
   const [currentPhotoIdx, setCurrentPhotoIdx] = useState(0);
   const [capturedPhotos, setCapturedPhotos] = useState<string[]>([]);
@@ -98,6 +101,79 @@ export default function BoothKioskPage() {
       }
     }
   }, []);
+
+  // Sinkronisasi Sesi Aktif dengan Admin Dashboard secara Real-Time
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // 1. Periksa sesi aktif awal di localStorage
+    const checkActiveSession = () => {
+      try {
+        const raw = localStorage.getItem('photobooth_active_session');
+        if (raw) {
+          const session = JSON.parse(raw);
+          if (session && session.visitorName && session.ticketNumber) {
+            setVisitorName(session.visitorName);
+            setTicketNumber(session.ticketNumber);
+            if (step === 'standby') {
+              setStep('welcome');
+              if (soundEnabled) retroAudio.playSuccessChime();
+            }
+          }
+        }
+      } catch {}
+    };
+
+    checkActiveSession();
+
+    // 2. BroadcastChannel untuk komunikasi tab/jendela instan
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('photobooth_session_sync');
+      channel.onmessage = (event) => {
+        if (event.data?.type === 'START_SESSION') {
+          setVisitorName(event.data.visitorName);
+          setTicketNumber(event.data.ticketNumber);
+          setCapturedPhotos([]);
+          setStep('welcome');
+          if (soundEnabled) retroAudio.playSuccessChime();
+        } else if (event.data?.type === 'RESET_TO_STANDBY') {
+          setStep('standby');
+          setVisitorName('');
+          setTicketNumber('');
+          setCapturedPhotos([]);
+        }
+      };
+    } catch {}
+
+    // 3. Storage event listener (jika antar-tab di browser yang sama)
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'photobooth_active_session') {
+        if (e.newValue) {
+          try {
+            const data = JSON.parse(e.newValue);
+            setVisitorName(data.visitorName);
+            setTicketNumber(data.ticketNumber);
+            setCapturedPhotos([]);
+            setStep('welcome');
+            if (soundEnabled) retroAudio.playSuccessChime();
+          } catch {}
+        } else {
+          setStep('standby');
+        }
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+
+    // 4. Polling ringan setiap 1 detik sebagai cadangan
+    const pollInterval = setInterval(checkActiveSession, 1000);
+
+    return () => {
+      if (channel) channel.close();
+      window.removeEventListener('storage', handleStorage);
+      clearInterval(pollInterval);
+    };
+  }, [step, soundEnabled]);
 
   const handleUnlock = (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,6 +250,39 @@ export default function BoothKioskPage() {
     setStep('countdown');
   };
 
+  // Saat pengunjung menekan tombol selesai di akhir sesi foto
+  const handleFinishSession = () => {
+    if (soundEnabled) retroAudio.playButtonClick();
+
+    // Beritahukan admin bahwa sesi ini telah selesai
+    try {
+      const channel = new BroadcastChannel('photobooth_session_sync');
+      channel.postMessage({ type: 'SESSION_COMPLETED', ticketNumber, visitorName });
+      channel.close();
+    } catch {}
+
+    // Simpan ke galeri publik lokal agar langsung muncul di halaman galeri
+    try {
+      const savedGalleries = JSON.parse(localStorage.getItem('photobooth_completed_sessions') || '[]');
+      const newEntry = {
+        id: `sess-${Date.now()}`,
+        number: ticketNumber || '#001',
+        nickname: visitorName || 'Pengunjung',
+        time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WIB',
+        photosCount: capturedPhotos.length || 4,
+        template: selectedTemplate.name,
+      };
+      localStorage.setItem('photobooth_completed_sessions', JSON.stringify([newEntry, ...savedGalleries]));
+    } catch {}
+
+    // Hapus sesi aktif dan kembalikan booth ke status STANDBY (tunggu admin set sesi berikutnya)
+    localStorage.removeItem('photobooth_active_session');
+    setStep('standby');
+    setVisitorName('');
+    setTicketNumber('');
+    setCapturedPhotos([]);
+  };
+
   // Mini preview layout pixel untuk kartu template
   const renderTemplateMiniPreview = (type: TemplateOption['previewType']) => {
     switch (type) {
@@ -231,12 +340,10 @@ export default function BoothKioskPage() {
   if (!isUnlocked) {
     return (
       <div className="w-screen h-screen bg-[#050C38] text-white flex flex-col items-center justify-center p-6 relative select-none overflow-hidden font-pixel">
-        {/* Latar Belakang Bintang & Skyline Kota */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#160078] via-[#050C38] to-[#010030] pointer-events-none" />
         <div className="absolute inset-0 bg-[url('/assets/pixel/stars-a.png')] bg-repeat pixel-art opacity-50 animate-twinkle pointer-events-none" />
         <div className="absolute bottom-0 left-0 right-0 h-48 bg-[url('/assets/pixel/city-night.png')] bg-repeat-x bg-bottom pixel-art opacity-30 pointer-events-none" />
 
-        {/* Dekorasi Pixel Poster di Bawah */}
         <div className="absolute bottom-0 left-8 z-0 hidden sm:block">
           <PixelStreetLamp height={110} />
         </div>
@@ -295,33 +402,30 @@ export default function BoothKioskPage() {
   }
 
   // =========================================================================
-  // 2. TAMPILAN APLIKASI BOOTH PIXEL METROPOLITAN (SIAP FOTO)
+  // 2. TAMPILAN APLIKASI BOOTH (STANDBY / SESI FOTO) - BISA DI-SCROLL
   // =========================================================================
   return (
-    <div className="relative w-screen h-screen bg-[#050C38] text-white flex flex-col justify-between overflow-hidden select-none font-pixel">
+    <div className="relative w-screen h-screen bg-[#050C38] text-white flex flex-col justify-between overflow-x-hidden select-none font-pixel">
       {/* 1. Latar Belakang Gradien Langit Malam Metropolitan */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#160078] via-[#050C38] to-[#010030] pointer-events-none" />
+      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#160078] via-[#050C38] to-[#010030] pointer-events-none" />
 
       {/* 2. Bintang Berkelip Pixel */}
-      <div className="absolute inset-0 bg-[url('/assets/pixel/stars-a.png')] bg-repeat pixel-art opacity-60 animate-twinkle pointer-events-none" />
+      <div className="fixed inset-0 bg-[url('/assets/pixel/stars-a.png')] bg-repeat pixel-art opacity-60 animate-twinkle pointer-events-none" />
 
-      {/* 3. Bintang Silang 4 Sudut Shimmering dari Poster */}
+      {/* 3. Bintang Silang 4 Sudut */}
       <div className="absolute top-12 left-16 pointer-events-none z-0">
         <PixelCrossStar size={18} />
       </div>
       <div className="absolute top-28 right-36 pointer-events-none z-0">
         <PixelCrossStar size={14} color="#5CE1E6" />
       </div>
-      <div className="absolute top-44 left-1/4 pointer-events-none z-0">
-        <PixelCrossStar size={10} color="#FFFFFF" />
-      </div>
 
-      {/* 4. Bulan Sabit Pixel di Sudut Kanan Atas */}
+      {/* 4. Bulan Sabit Pixel */}
       <div className="absolute top-6 right-10 w-16 h-16 pointer-events-none pixel-art z-0 opacity-90 drop-shadow-[0_0_15px_rgba(255,255,255,0.4)]">
         <Image src="/assets/pixel/moon.png" alt="Moon" width={64} height={64} className="pixel-art" />
       </div>
 
-      {/* 5. Awan Pixel Mengambang Perlahan (Multi-Layer) */}
+      {/* 5. Awan Mengambang */}
       <div className="absolute top-14 left-0 w-32 h-16 pointer-events-none pixel-art z-0 opacity-70 animate-cloud-slow">
         <Image src="/assets/pixel/cloud-1.png" alt="Cloud" width={128} height={64} className="pixel-art" />
       </div>
@@ -329,33 +433,29 @@ export default function BoothKioskPage() {
         <Image src="/assets/pixel/cloud-2.png" alt="Cloud" width={160} height={80} className="pixel-art" />
       </div>
 
-      {/* 6. Siluet Burung Terbang di Langit Malam */}
+      {/* 6. Siluet Burung Terbang */}
       <div className="absolute top-36 left-1/3 pointer-events-none z-0">
         <PixelFlyingBirds />
       </div>
 
-      {/* 7. Skyline Gedung Kota Malam (Metropolitan) di Bagian Bawah */}
-      <div className="absolute bottom-0 left-0 right-0 h-48 bg-[url('/assets/pixel/city-night.png')] bg-repeat-x bg-bottom pixel-art opacity-45 pointer-events-none z-0" />
+      {/* 7. Skyline Gedung Kota Malam */}
+      <div className="fixed bottom-0 left-0 right-0 h-48 bg-[url('/assets/pixel/city-night.png')] bg-repeat-x bg-bottom pixel-art opacity-45 pointer-events-none z-0" />
 
       {/* 8. Elemen Foreground Jalan & Taman dari Poster */}
-      {/* Lampu Jalan Kiri & Semak */}
-      <div className="absolute bottom-6 left-4 z-0 hidden lg:flex flex-col items-center pointer-events-none">
+      <div className="fixed bottom-6 left-4 z-0 hidden lg:flex flex-col items-center pointer-events-none">
         <PixelStreetLamp height={130} />
         <PixelBushes width={90} className="-mt-3" />
       </div>
 
-      {/* Mobil Magenta Retro di Sisi Kiri Bawah */}
-      <div className="absolute bottom-4 left-32 z-0 hidden xl:block pointer-events-none opacity-85">
+      <div className="fixed bottom-4 left-32 z-0 hidden xl:block pointer-events-none opacity-85">
         <PixelCar width={130} />
       </div>
 
-      {/* Bangku Taman Tengah Bawah */}
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-0 hidden 2xl:block pointer-events-none opacity-75">
+      <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-0 hidden 2xl:block pointer-events-none opacity-75">
         <PixelBench width={120} />
       </div>
 
-      {/* Vending Machine Biru Neon & Lampu Jalan Kanan */}
-      <div className="absolute bottom-4 right-4 z-0 hidden lg:flex items-end gap-3 pointer-events-none">
+      <div className="fixed bottom-4 right-4 z-0 hidden lg:flex items-end gap-3 pointer-events-none">
         <PixelVendingMachine height={110} />
         <div className="flex flex-col items-center">
           <PixelStreetLamp height={130} />
@@ -363,24 +463,31 @@ export default function BoothKioskPage() {
         </div>
       </div>
 
-      {/* Flash Effect Layer (StyleGuide.md: kuning #FFD84D) */}
+      {/* Flash Effect Layer */}
       {isFlashActive && (
-        <div className="absolute inset-0 bg-[#FFD84D] opacity-95 z-50 pointer-events-none transition-opacity duration-300" />
+        <div className="fixed inset-0 bg-[#FFD84D] opacity-95 z-50 pointer-events-none transition-opacity duration-300" />
       )}
 
       {/* Header Aplikasi Booth Kios */}
-      <header className="px-6 py-4 flex items-center justify-between border-b-4 border-[#4B57B2] z-20 bg-[#0C1230]/85 backdrop-blur">
+      <header className="px-6 py-4 flex items-center justify-between border-b-4 border-[#4B57B2] z-30 bg-[#0C1230]/90 backdrop-blur sticky top-0">
         <div className="flex items-center gap-3">
-          <span className="w-3 h-3 bg-[#00E599] animate-pulse shadow-[0_0_8px_#00E599]" />
+          <span className={`w-3 h-3 ${step === 'standby' ? 'bg-[#FFD84D]' : 'bg-[#00E599]'} animate-pulse shadow-[0_0_8px_currentColor]`} />
           <span className="font-pixel-title text-xs text-[#A9B8FF] tracking-wider">
             EXPO WISUDA TIK 2026 &bull; PHOTOBOOTH APP
           </span>
         </div>
 
         <div className="flex items-center gap-4 text-xs">
-          <span className="bg-[#131947] px-3 py-1 border-2 border-[#4B57B2] text-[#FFD84D] font-pixel-title text-xs">
-            TIKET: {ticketNumber}
-          </span>
+          {ticketNumber ? (
+            <span className="bg-[#131947] px-3 py-1 border-2 border-[#4B57B2] text-[#FFD84D] font-pixel-title text-xs">
+              TIKET: {ticketNumber}
+            </span>
+          ) : (
+            <span className="bg-[#131947] px-3 py-1 border-2 border-[#4B57B2] text-[#5CE1E6] font-pixel-title text-xs">
+              STANDBY
+            </span>
+          )}
+
           <button
             onClick={() => {
               setSoundEnabled(!soundEnabled);
@@ -407,11 +514,46 @@ export default function BoothKioskPage() {
         </div>
       </header>
 
-      {/* Konten Utama Interaktif Booth */}
-      <main className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 text-center z-20 max-w-4xl mx-auto w-full relative">
-        {/* Step 1: Layar Sapaan Pengunjung */}
+      {/* Konten Utama Interaktif Booth (Bisa Di-scroll Secara Mulus) */}
+      <main className="flex-1 overflow-y-auto overflow-x-hidden w-full max-w-5xl mx-auto p-4 sm:p-6 z-20 relative flex flex-col items-center justify-center my-auto">
+        {/* ===================================================================
+            STEP 0: STANDBY (MOHON TUNGGU SEBENTAR - BELUM DI-SET OLEH ADMIN)
+            =================================================================== */}
+        {step === 'standby' && (
+          <div className="animate-fadeIn max-w-xl w-full bg-[#0C1230]/95 pixel-box p-8 text-center backdrop-blur shadow-[0_0_24px_rgba(5,12,56,0.9)]">
+            <div className="w-16 h-16 mx-auto pixel-box-cyber bg-[#160078] text-[#FFD84D] flex items-center justify-center mb-5">
+              <Hourglass className="w-8 h-8 animate-spin" style={{ animationDuration: '6s' }} />
+            </div>
+
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <PixelCrossStar size={12} />
+              <h1 className="font-pixel-title text-lg sm:text-2xl text-[#FFD84D] tracking-wider leading-relaxed">
+                MOHON TUNGGU SEBENTAR
+              </h1>
+              <PixelCrossStar size={12} />
+            </div>
+
+            <h2 className="font-pixel-title text-xs sm:text-sm text-[#5CE1E6] mb-6">
+              BILIK PHOTOBOOTH SEDANG DISIAPKAN
+            </h2>
+
+            <p className="text-xs sm:text-sm text-white/80 mb-6 leading-relaxed">
+              Silakan menunggu arahan dari operator di meja kendali. Layar ini akan <span className="text-[#FFD84D] font-bold">otomatis aktif</span> begitu nama dan nomor antrean Anda dipanggil untuk berfoto.
+            </p>
+
+            {/* Indikator Status Standby */}
+            <div className="p-3 bg-[#050C38] border-2 border-[#4B57B2] flex items-center justify-center gap-3 text-[11px] font-pixel-title text-[#A9B8FF]">
+              <span className="w-2.5 h-2.5 bg-[#FFD84D] animate-ping" />
+              <span>STATUS: STANDBY &bull; MENUNGGU OPERATOR</span>
+            </div>
+          </div>
+        )}
+
+        {/* ===================================================================
+            STEP 1: WELCOME (GILIRAN KAMU SEKARANG - SETELAH ADMIN KLIK MULAI SESI)
+            =================================================================== */}
         {step === 'welcome' && (
-          <div className="animate-fadeIn max-w-2xl bg-[#0C1230]/90 pixel-box p-8 backdrop-blur">
+          <div className="animate-fadeIn max-w-2xl bg-[#0C1230]/95 pixel-box p-8 backdrop-blur text-center">
             <div className="flex items-center justify-center gap-2 mb-3">
               <PixelCrossStar size={12} />
               <span className="font-pixel-title text-xs text-[#FFD84D] tracking-wider">
@@ -420,8 +562,8 @@ export default function BoothKioskPage() {
               <PixelCrossStar size={12} />
             </div>
 
-            <h1 className="font-pixel-title text-2xl sm:text-3xl text-white mb-4 leading-relaxed">
-              HALO, {visitorName}!
+            <h1 className="font-pixel-title text-2xl sm:text-4xl text-white mb-4 leading-relaxed">
+              HALO, {visitorName.toUpperCase()}!
             </h1>
             <p className="text-sm text-[#A9B8FF] mb-8 leading-relaxed">
               Nomor antrean <span className="text-[#FFD84D] font-bold">{ticketNumber}</span> siap berfoto di bilik booth.
@@ -440,9 +582,11 @@ export default function BoothKioskPage() {
           </div>
         )}
 
-        {/* Step 2: Pilih Desain Bingkai dengan Pratinjau Miniatur Pixel */}
+        {/* ===================================================================
+            STEP 2: PILIH DESAIN BINGKAI
+            =================================================================== */}
         {step === 'choosing_design' && (
-          <div className="w-full animate-fadeIn bg-[#0C1230]/90 pixel-box p-6 sm:p-8 backdrop-blur">
+          <div className="w-full animate-fadeIn bg-[#0C1230]/90 pixel-box p-6 sm:p-8 backdrop-blur text-center">
             <h2 className="font-pixel-title text-base sm:text-lg text-[#FFD84D] mb-1">
               PILIH DESAIN BINGKAI FOTO 4R
             </h2>
@@ -464,7 +608,6 @@ export default function BoothKioskPage() {
                       : 'border-[#4B57B2] bg-[#131947]/70 hover:border-white/50'
                   }`}
                 >
-                  {/* Pratinjau Miniatur Garis Pixel */}
                   <div className="flex-shrink-0">
                     {renderTemplateMiniPreview(tpl.previewType)}
                   </div>
@@ -494,7 +637,9 @@ export default function BoothKioskPage() {
           </div>
         )}
 
-        {/* Step 3: Hitung Mundur & Viewfinder Kamera Pixel Realistis */}
+        {/* ===================================================================
+            STEP 3: HITUNG MUNDUR & VIEWFINDER KAMERA PIXEL REALISTIS
+            =================================================================== */}
         {(step === 'countdown' || step === 'flash') && (
           <PixelCameraViewfinder
             countdownNum={countdownNum}
@@ -504,9 +649,11 @@ export default function BoothKioskPage() {
           />
         )}
 
-        {/* Step 4: Tinjau & Retake Per Foto */}
+        {/* ===================================================================
+            STEP 4: TINJAU & RETAKE PER FOTO
+            =================================================================== */}
         {step === 'review' && (
-          <div className="w-full animate-fadeIn bg-[#0C1230]/90 pixel-box p-6 sm:p-8 backdrop-blur">
+          <div className="w-full animate-fadeIn bg-[#0C1230]/90 pixel-box p-6 sm:p-8 backdrop-blur text-center">
             <h2 className="font-pixel-title text-base text-[#FFD84D] mb-1">
               TINJAU HASIL FOTO ANDA
             </h2>
@@ -550,24 +697,22 @@ export default function BoothKioskPage() {
           </div>
         )}
 
-        {/* Step 5: Hasil Siap & Animasi Dispenser Kertas Strip Foto */}
+        {/* ===================================================================
+            STEP 5: HASIL SIAP, QR CODE & DISPENSER STRIP (DAPAT DI-SCROLL LANCAR)
+            =================================================================== */}
         {step === 'result' && (
           <PixelPhotoStripDispenser
-            visitorName={visitorName}
-            ticketNumber={ticketNumber}
-            photos={capturedPhotos}
+            visitorName={visitorName || 'Diana'}
+            ticketNumber={ticketNumber || '#001'}
+            photos={capturedPhotos.length > 0 ? capturedPhotos : ['#1D4ED8', '#BE185D', '#047857', '#B45309']}
             templateName={selectedTemplate.name}
-            onReset={() => {
-              if (soundEnabled) retroAudio.playButtonClick();
-              setStep('welcome');
-              setCapturedPhotos([]);
-            }}
+            onReset={handleFinishSession}
           />
         )}
       </main>
 
       {/* Footer Kios */}
-      <footer className="px-6 py-3 border-t-4 border-[#4B57B2] flex items-center justify-between text-[11px] text-[#A9B8FF] z-20 bg-[#0C1230]/90">
+      <footer className="px-6 py-3 border-t-4 border-[#4B57B2] flex items-center justify-between text-[11px] text-[#A9B8FF] z-30 bg-[#0C1230]/90">
         <span>EXPO WISUDA JURUSAN TIK 2026 &bull; PHOTOBOOTH SYSTEM</span>
         <span className="text-[#FFD84D]">CANON 1200D &bull; EPSON L300 4R READY</span>
       </footer>
