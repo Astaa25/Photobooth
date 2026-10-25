@@ -385,38 +385,55 @@ export default function BoothKioskPage() {
 
   // Hubungkan langsung kabel USB OTG Canon di tablet via WebUSB (Chrome Android)
   const handleConnectWebUsb = async () => {
-    if (typeof navigator !== 'undefined' && 'usb' in navigator) {
-      try {
-        setTabletUsbStatus(null);
-        const device = await (navigator as any).usb.requestDevice({
-          filters: [{ vendorId: 0x04a9 }], // Vendor ID Canon Inc.
-        });
-        if (device) {
-          await device.open().catch(() => {});
-          const devName = device.productName || 'Canon EOS 1200D';
-          setTabletUsbStatus({
-            connected: true,
-            deviceName: devName,
-          });
-          setCanonApiStatus({
-            connected: true,
-            cameraName: `${devName} (USB OTG Tablet)`,
-          });
-          handleSwitchCamera('canon');
-          if (soundEnabled) retroAudio.playSuccessChime();
-        }
-      } catch (err: any) {
-        console.warn('WebUSB request error:', err);
+    setTabletUsbStatus(null);
+
+    const isSecure = typeof window !== 'undefined' ? window.isSecureContext : false;
+    const hasUsb = typeof navigator !== 'undefined' && 'usb' in navigator;
+
+    if (!hasUsb) {
+      if (!isSecure) {
         setTabletUsbStatus({
           connected: false,
           error:
-            err?.name === 'SecurityError'
-              ? 'Izin akses USB ditolak browser.'
-              : err?.message || 'Pastikan aplikasi Camera Connect & Control sudah ditutup dari Recent Apps agar port USB tidak terkunci.',
+            'Di Redmi Pad 2, browser membatasi WebUSB di alamat HTTP (192.168.x.x). Solusi termudah: Colok kamera ke LAPTOP dan gunakan Tab "1. BUKA DI TABLET (NIRKABEL)" tanpa perlu kabel apapun ke tablet! Atau jika ingin kabel ke tablet, aktifkan izin di chrome://flags.',
+        });
+      } else {
+        setTabletUsbStatus({
+          connected: false,
+          error:
+            'Browser bawaan Xiaomi (Mi Browser) di Redmi Pad 2 tidak mendukung WebUSB. Silakan buka alamat web ini menggunakan aplikasi Google Chrome di tablet Anda.',
         });
       }
-    } else {
-      alert('Fitur WebUSB memerlukan Google Chrome di Android atau Desktop.');
+      return;
+    }
+
+    try {
+      const device = await (navigator as any).usb.requestDevice({
+        filters: [{ vendorId: 0x04a9 }], // Vendor ID Canon Inc.
+      });
+      if (device) {
+        await device.open().catch(() => {});
+        const devName = device.productName || 'Canon EOS 1200D';
+        setTabletUsbStatus({
+          connected: true,
+          deviceName: devName,
+        });
+        setCanonApiStatus({
+          connected: true,
+          cameraName: `${devName} (USB OTG Tablet)`,
+        });
+        handleSwitchCamera('canon');
+        if (soundEnabled) retroAudio.playSuccessChime();
+      }
+    } catch (err: any) {
+      console.warn('WebUSB request error:', err);
+      setTabletUsbStatus({
+        connected: false,
+        error:
+          err?.name === 'SecurityError'
+            ? 'Izin akses USB ditolak browser.'
+            : err?.message || 'Pastikan aplikasi Camera Connect & Control sudah ditutup dari Recent Apps agar port USB tidak terkunci.',
+      });
     }
   };
 
@@ -2008,26 +2025,36 @@ export default function BoothKioskPage() {
                   </div>
                 )}
 
-                {/* Konten Tab 2: USB OTG Tablet & Solusi "Camera Connect & Control" */}
+                {/* Konten Tab 2: USB OTG Tablet & Solusi Redmi Pad 2 */}
                 {activeCanonTab === 'usb-otg' && (
                   <div className="bg-[#0C1230] p-3 border border-[#00E599]/60 text-left text-[10px] font-sans space-y-2.5">
                     <div className="flex items-center gap-1.5 text-[#00E599] font-pixel-title text-[10px]">
                       <Usb className="w-4 h-4 text-[#00E599]" />
-                      <span>KONEKSI KABEL USB OTG LANGSUNG KE TABLET:</span>
+                      <span>KONEKSI KABEL USB OTG LANGSUNG KE REDMI PAD 2:</span>
                     </div>
 
-                    <div className="p-2 bg-[#FE0168]/15 border border-[#FE0168]/60 text-white/90 leading-relaxed">
-                      <p className="font-bold text-[#FFD84D] font-pixel-title text-[9px] mb-1">
-                        ⚠️ PENTING TENTANG &quot;CAMERA CONNECT &amp; CONTROL&quot;:
+                    {/* Panduan Spesifik Redmi Pad 2 */}
+                    <div className="p-2.5 bg-[#131947] border border-[#5CE1E6]/60 text-white/90 leading-relaxed space-y-1.5">
+                      <p className="font-bold text-[#FFD84D] font-pixel-title text-[9px]">
+                        📱 PANDUAN PENGGUNA REDMI PAD 2 (XIAOMI):
                       </p>
-                      <p>
-                        Aplikasi <em>Camera Connect &amp; Control</em> di Android mengunci port USB secara eksklusif. Agar aplikasi web kita di Chrome bisa mengakses kamera Canon:
-                      </p>
-                      <ul className="list-disc list-inside mt-1 space-y-0.5 text-[9.5px]">
-                        <li>Buka <strong>Recent Apps</strong> di tablet Anda, lalu <strong>tutup / swipe close</strong> aplikasi <em>Camera Connect &amp; Control</em>.</li>
-                        <li>Pastikan kamera Canon dalam posisi ON.</li>
-                        <li>Klik tombol hijau di bawah ini, lalu pilih <strong>&quot;OK / Izinkan&quot;</strong> pada popup izin Android.</li>
+                      <ul className="list-disc list-inside space-y-1 text-[9.5px] text-white/80">
+                        <li>
+                          <strong>Wajib Buka di Google Chrome:</strong> Jangan gunakan <em>Mi Browser</em> (browser bawaan Xiaomi), karena Mi Browser mematikan fitur WebUSB.
+                        </li>
+                        <li>
+                          <strong>Tutup Camera Connect &amp; Control:</strong> Pastikan aplikasi tersebut di-swipe tutup dari Recent Apps agar port USB tidak terkunci eksklusif.
+                        </li>
+                        <li>
+                          <strong>Aktifkan Izin USB di Chrome (Khusus HTTP):</strong> Di Chrome tablet, buka tab baru lalu ketik <code className="text-[#00E599] bg-black/60 px-1 font-mono">chrome://flags</code> &rarr; cari <code className="text-[#FFD84D]">unsafely-treat-insecure-origin-as-secure</code> &rarr; pilih <strong>Enabled</strong> &rarr; masukkan alamat IP laptop &rarr; klik tombol biru <strong>Relaunch</strong>.
+                        </li>
                       </ul>
+                    </div>
+
+                    <div className="p-2 bg-[#FFD84D]/10 border border-[#FFD84D]/40 text-[#FFD84D] text-[9.5px]">
+                      💡 <strong>SARAN TERBAIK (TANPA KABEL KE TABLET):</strong>
+                      <br />
+                      Jika kamera Canon dicolok ke <strong>Laptop</strong>, Anda <strong>TIDAK PERLU</strong> repot mengatur kabel USB di tablet! Cukup gunakan <strong>Tab 1 (BUKA DI TABLET)</strong>. Tablet langsung berfungsi sebagai layar sentuh nirkabel.
                     </div>
 
                     <button
@@ -2040,7 +2067,7 @@ export default function BoothKioskPage() {
                     </button>
 
                     {tabletUsbStatus && (
-                      <div className={`p-2 border text-[9.5px] font-mono ${tabletUsbStatus.connected ? 'bg-[#00E599]/20 border-[#00E599] text-[#00E599]' : 'bg-[#FE0168]/20 border-[#FE0168] text-[#FFD84D]'}`}>
+                      <div className={`p-2 border text-[9.5px] font-mono leading-relaxed ${tabletUsbStatus.connected ? 'bg-[#00E599]/20 border-[#00E599] text-[#00E599]' : 'bg-[#FE0168]/20 border-[#FE0168] text-[#FFD84D]'}`}>
                         {tabletUsbStatus.connected
                           ? `✓ Sukses Terhubung: ${tabletUsbStatus.deviceName}`
                           : `✕ ${tabletUsbStatus.error}`}
