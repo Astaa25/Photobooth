@@ -1,0 +1,13 @@
+<resources>
+    <style name="Theme.Photobooth.Fullscreen" parent="Theme.MaterialComponents.NoActionBar">
+        <item name="android:windowBackground">@color/bg_dark</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:statusBarColor">@color/bg_dark</item>
+        <item name="android:navigationBarColor">@color/bg_dark</item>
+        <item name="colorPrimary">@color/neon_pink</item>
+        <item name="colorSecondary">@color/neon_yellow</item>
+    </style>
+</resources>

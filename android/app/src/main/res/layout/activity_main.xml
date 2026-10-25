@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/rootContainer"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_dark">
+
+    <!-- WebView Utama Kiosk -->
+    <WebView
+        android:id="@+id/kioskWebView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/bg_dark" />
+
+    <!-- Indikator Loading Bar Retro di Bagian Atas -->
+    <ProgressBar
+        android:id="@+id/loadProgressBar"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="4dp"
+        android:layout_gravity="top"
+        android:indeterminate="false"
+        android:max="100"
+        android:progressTint="@color/neon_yellow"
+        android:visibility="gone" />
+
+    <!-- Layar Kesalahan Koneksi (Fallback jika laptop belum dinyalakan atau IP salah) -->
+    <LinearLayout
+        android:id="@+id/errorView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="24dp"
+        android:background="@color/bg_dark"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@color/box_dark"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="28dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="[ ! ] TIDAK BISA TERHUBUNG KE LAPTOP"
+                android:textColor="@color/neon_pink"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/txtErrorDetail"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:gravity="center"
+                android:text="Pastikan Tablet dan Laptop terhubung ke Wi-Fi / Hotspot yang sama dan server berjalan."
+                android:textColor="@color/white"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/txtTargetUrl"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textColor="@color/neon_cyan"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btnRetry"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:backgroundTint="@color/neon_green"
+                    android:text="@string/retry"
+                    android:textColor="@color/bg_dark"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/btnChangeIp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:backgroundTint="@color/border_blue"
+                    android:text="@string/change_server"
+                    android:textColor="@color/white" />
+            </LinearLayout>
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Tombol Mengambang Pengaturan IP (Sudut Kanan Bawah atau Kanan Atas) -->
+    <ImageButton
+        android:id="@+id/btnOpenSettings"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="12dp"
+        android:background="@color/box_dark"
+        android:contentDescription="Pengaturan IP"
+        android:alpha="0.4"
+        android:src="@android:drawable/ic_menu_preferences"
+        android:tint="@color/neon_cyan" />
+
+</FrameLayout>

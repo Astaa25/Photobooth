@@ -26,7 +26,10 @@ import {
   Wifi,
   Usb,
   Download,
+  QrCode,
+  ExternalLink,
 } from 'lucide-react';
+import QRCode from 'qrcode';
 import { retroAudio } from '@/utils/audio';
 import {
   getSharedWebcamStream,
@@ -187,9 +190,13 @@ export default function BoothKioskPage() {
   const [tabletUsbStatus, setTabletUsbStatus] = useState<{ connected: boolean; deviceName?: string; error?: string } | null>(null);
   const [activeCanonTab, setActiveCanonTab] = useState<'wireless-tablet' | 'usb-otg' | 'laptop-host'>('wireless-tablet');
   const [isCopiedUrl, setIsCopiedUrl] = useState(false);
+  const [isCopiedApkUrl, setIsCopiedApkUrl] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isStandaloneApp, setIsStandaloneApp] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+  const [apkQrDataUrl, setApkQrDataUrl] = useState<string | null>(null);
+  const GITHUB_RELEASES_URL = 'https://github.com/Astaa25/Photobooth/releases';
+  const APK_DOWNLOAD_URL = 'https://github.com/Astaa25/Photobooth/releases/download/v1.0.0/photobooth-tablet-kiosk.apk';
   const testVideoRef = useRef<HTMLVideoElement | null>(null);
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const [dynamicCardWidth, setDynamicCardWidth] = useState<number>(360);
@@ -251,24 +258,27 @@ export default function BoothKioskPage() {
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('appinstalled', handleAppInstalled);
 
+    // Buat QR Code untuk download langsung file APK dari GitHub Releases
+    QRCode.toDataURL(GITHUB_RELEASES_URL, {
+      width: 180,
+      margin: 1,
+      color: {
+        dark: '#050C38',
+        light: '#FFFFFF',
+      },
+    })
+      .then((url) => setApkQrDataUrl(url))
+      .catch(() => {});
+
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
   }, [soundEnabled]);
 
-  const handleInstallApk = async () => {
+  const handleInstallApk = () => {
     if (soundEnabled) retroAudio.playButtonClick();
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const choice = await deferredPrompt.userChoice;
-      if (choice && choice.outcome === 'accepted') {
-        setIsStandaloneApp(true);
-      }
-      setDeferredPrompt(null);
-    } else {
-      setIsInstallModalOpen(true);
-    }
+    setIsInstallModalOpen(true);
   };
 
   // Periksa apakah tablet sudah diaktifkan di sesi browser ini & kunci scroll window agar pas 1 layar
@@ -2157,74 +2167,157 @@ export default function BoothKioskPage() {
         </div>
       )}
 
-      {/* Modal Panduan Pasang / Download APK di Tablet */}
+      {/* Modal Panduan Download & Pasang APK Mandiri dari GitHub (Khusus Tablet Redmi Pad 2) */}
       {isInstallModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#050C38] border-2 border-[#FFD84D] w-full max-w-lg p-5 shadow-2xl relative pixel-box">
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 font-pixel">
+          <div className="bg-[#050C38] border-2 sm:border-4 border-[#FFD84D] w-full max-w-xl p-4 sm:p-6 shadow-[0_0_30px_rgba(5,12,56,0.9)] relative pixel-box max-h-[92vh] overflow-y-auto">
             <button
               type="button"
               onClick={() => setIsInstallModalOpen(false)}
-              className="absolute top-3 right-3 text-[#FFD84D] hover:text-white p-1"
+              className="absolute top-3 right-3 text-[#FFD84D] hover:text-[#FE0168] p-1 transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
 
-            <div className="flex items-center gap-3 mb-4 border-b border-[#4B57B2] pb-3">
-              <div className="w-12 h-12 bg-[#FE0168]/20 border border-[#FE0168] text-[#FE0168] flex items-center justify-center shrink-0">
+            {/* Header Modal */}
+            <div className="flex items-center gap-3 mb-4 border-b-2 border-[#4B57B2] pb-3">
+              <div className="w-11 h-11 bg-[#FE0168]/20 border-2 border-[#FE0168] text-[#FE0168] flex items-center justify-center shrink-0">
                 <Tablet className="w-6 h-6 text-[#FFD84D]" />
               </div>
               <div>
-                <h3 className="font-pixel-title text-sm text-[#FFD84D]">
-                  PASANG / DOWNLOAD APK DI TABLET
+                <h3 className="font-pixel-title text-xs sm:text-sm text-[#FFD84D]">
+                  UNDUH RELEASE .APK ANDROID (GITHUB)
                 </h3>
-                <p className="text-[11px] text-[#A9B8FF] font-sans">
-                  Aplikasi Kiosk Layar Penuh Resmi untuk Tablet Android
+                <p className="text-[10px] sm:text-[11px] text-[#5CE1E6] font-sans">
+                  Aplikasi Mandiri Tablet Redmi Pad 2 &bull; Layar Penuh Tanpa Google Chrome
                 </p>
               </div>
             </div>
 
-            <div className="space-y-3 text-xs font-sans text-white/90 mb-5">
-              <div className="p-3 bg-[#0C1230] border border-[#00E599]/60 flex items-start gap-2.5">
-                <span className="w-6 h-6 bg-[#00E599] text-[#050C38] font-pixel-title font-bold text-xs flex items-center justify-center shrink-0">1</span>
-                <div>
-                  <p className="font-bold text-[#00E599] font-pixel-title text-[10px] mb-0.5">BUKA DI CHROME TABLET</p>
-                  <p className="text-white/80 text-[11px]">Buka Google Chrome di tablet Anda, lalu ketik alamat:</p>
-                  <code className="inline-block mt-1 p-1 bg-black/60 text-[#FFD84D] font-mono text-[11px] border border-white/20 select-all">
-                    {tabletConnectionInfo.tabletBoothUrl || `http://192.168.110.93:3000/booth`}
-                  </code>
+            {/* Konten Utama: Download + QR Code + Langkah Pemasangan */}
+            <div className="space-y-4 text-xs font-sans text-white/90 mb-5">
+              
+              {/* Kartu Tombol Unduh & QR Code */}
+              <div className="p-3.5 bg-[#0C1230] border-2 border-[#00E599] flex flex-col sm:flex-row items-center gap-4">
+                {/* QR Code untuk Kamera Tablet */}
+                <div className="flex flex-col items-center shrink-0 bg-white p-2 border-2 border-[#4B57B2]">
+                  {apkQrDataUrl ? (
+                    <img src={apkQrDataUrl} alt="QR Code GitHub Releases APK" className="w-28 h-28 pixel-art" />
+                  ) : (
+                    <div className="w-28 h-28 bg-[#050C38] flex items-center justify-center text-[#FFD84D]">
+                      <QrCode className="w-8 h-8 animate-pulse" />
+                    </div>
+                  )}
+                  <span className="text-[9px] text-[#050C38] font-bold mt-1 text-center font-pixel">
+                    SCAN DENGAN TABLET
+                  </span>
+                </div>
+
+                {/* Tombol Aksi Unduh */}
+                <div className="flex-1 w-full space-y-2 text-center sm:text-left">
+                  <div className="text-[11px] text-white/80 leading-relaxed">
+                    Unduh file paket instalasi <span className="text-[#00E599] font-mono font-bold">photobooth-tablet-kiosk.apk</span> resmi dari GitHub Releases:
+                  </div>
+
+                  <a
+                    href={GITHUB_RELEASES_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-2.5 px-3 pixel-btn bg-[#00E599] hover:bg-[#5CE1E6] text-[#050C38] font-pixel-title font-bold text-[11px] flex items-center justify-center gap-2 shadow active:scale-95 text-center"
+                  >
+                    <Download className="w-4 h-4 text-[#050C38]" />
+                    <span>⬇️ BUKA GITHUB RELEASES (UNDUH APK)</span>
+                    <ExternalLink className="w-3.5 h-3.5 text-[#050C38]" />
+                  </a>
+
+                  <div className="flex items-center gap-1.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(APK_DOWNLOAD_URL);
+                        setIsCopiedApkUrl(true);
+                        setTimeout(() => setIsCopiedApkUrl(false), 2500);
+                        if (soundEnabled) retroAudio.playSuccessChime();
+                      }}
+                      className="flex-1 py-1.5 px-2 bg-[#131947] hover:bg-[#160078] border border-[#5CE1E6] text-[#5CE1E6] text-[10px] font-pixel flex items-center justify-center gap-1 active:scale-95"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span>{isCopiedApkUrl ? 'LINK APK TERSALIN! ✓' : 'Salin Link Langsung APK'}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              <div className="p-3 bg-[#0C1230] border border-[#5CE1E6]/60 flex items-start gap-2.5">
-                <span className="w-6 h-6 bg-[#5CE1E6] text-[#050C38] font-pixel-title font-bold text-xs flex items-center justify-center shrink-0">2</span>
-                <div>
-                  <p className="font-bold text-[#5CE1E6] font-pixel-title text-[10px] mb-0.5">KETUK MENU TITIK TIGA (⋮)</p>
-                  <p className="text-white/80 text-[11px]">Di pojok kanan atas layar Chrome tablet, ketuk menu titik tiga (<strong>⋮</strong>).</p>
+              {/* Panduan 4 Langkah Pasang di Redmi Pad 2 */}
+              <div className="space-y-2">
+                <div className="p-2.5 bg-[#0C1230] border border-[#4B57B2] flex items-start gap-2.5">
+                  <span className="w-5 h-5 bg-[#FFD84D] text-[#050C38] font-pixel font-bold text-xs flex items-center justify-center shrink-0">1</span>
+                  <div>
+                    <p className="font-bold text-[#FFD84D] font-pixel text-[10px]">UNDUH FILE .APK DARI GITHUB</p>
+                    <p className="text-white/80 text-[10.5px]">
+                      Buka rilis GitHub melalui tombol di atas atau scan QR di tablet Redmi Pad 2, lalu unduh file <strong>photobooth-tablet-kiosk.apk</strong>.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-2.5 bg-[#0C1230] border border-[#4B57B2] flex items-start gap-2.5">
+                  <span className="w-5 h-5 bg-[#5CE1E6] text-[#050C38] font-pixel font-bold text-xs flex items-center justify-center shrink-0">2</span>
+                  <div>
+                    <p className="font-bold text-[#5CE1E6] font-pixel text-[10px]">PASANG (INSTALL) DI TABLET</p>
+                    <p className="text-white/80 text-[10.5px]">
+                      Buka file APK yang telah diunduh di Redmi Pad 2 &gt; pilih <strong>Pasang / Install</strong>. Jika MIUI/HyperOS meminta izin &quot;Instal aplikasi dari sumber tidak dikenal&quot;, pilih <strong>Izinkan</strong>.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-2.5 bg-[#0C1230] border border-[#4B57B2] flex items-start gap-2.5">
+                  <span className="w-5 h-5 bg-[#FE0168] text-white font-pixel font-bold text-xs flex items-center justify-center shrink-0">3</span>
+                  <div>
+                    <p className="font-bold text-[#FE0168] font-pixel text-[10px]">BUKA APLIKASI &amp; SAMBUNGKAN KE LAPTOP</p>
+                    <p className="text-white/80 text-[10.5px]">
+                      Buka aplikasi <strong>Photobooth Kiosk</strong> di tablet. Masukkan alamat IP laptop ini:
+                    </p>
+                    <code className="inline-block mt-1 p-1 bg-black/70 text-[#00E599] font-mono text-[10.5px] border border-white/20 select-all">
+                      {tabletConnectionInfo.tabletBoothUrl || 'http://192.168.1.100:3000/booth'}
+                    </code>
+                  </div>
                 </div>
               </div>
 
-              <div className="p-3 bg-[#0C1230] border border-[#FE0168]/60 flex items-start gap-2.5">
-                <span className="w-6 h-6 bg-[#FE0168] text-white font-pixel-title font-bold text-xs flex items-center justify-center shrink-0">3</span>
-                <div>
-                  <p className="font-bold text-[#FE0168] font-pixel-title text-[10px] mb-0.5">PILIH &quot;PASANG APLIKASI&quot; (INSTALL APP)</p>
-                  <p className="text-white/80 text-[11px]">
-                    Pilih menu <strong>&quot;Pasang Aplikasi&quot;</strong> atau <strong>&quot;Tambahkan ke Layar Utama&quot;</strong>. Android akan otomatis mengunduh &amp; menginstal APK resmi ke layar utama tablet Anda!
-                  </p>
-                </div>
+              {/* Info Keunggulan Kiosk */}
+              <div className="p-2.5 bg-[#FFD84D]/10 border border-[#FFD84D]/40 text-[10.5px] text-[#FFD84D] leading-relaxed">
+                ✨ <strong>Keunggulan Versi APK Kiosk:</strong> Berjalan <strong>100% Layar Penuh (Fullscreen Kiosk)</strong> tanpa bilah URL Google Chrome, layar tablet dijamin <strong>tidak akan tidur/mati</strong> saat pengunjung mengantre, dan izin kamera langsung otomatis!
               </div>
 
-              <div className="p-2.5 bg-[#FFD84D]/10 border border-[#FFD84D]/40 text-[10.5px] text-[#FFD84D]">
-                ✨ <strong>Keunggulan Mode APK Kiosk:</strong> Saat dibuka dari layar utama tablet, aplikasi otomatis berjalan <strong>Layar Penuh (Full Screen Kiosk)</strong> tanpa bilah URL atau tab browser, sehingga pengunjung tidak bisa mengotak-atik sistem!
-              </div>
+              {/* Opsi Cadangan: PWA jika ada */}
+              {deferredPrompt && (
+                <div className="pt-2 border-t border-white/10 text-center">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      deferredPrompt.prompt();
+                      const choice = await deferredPrompt.userChoice;
+                      if (choice && choice.outcome === 'accepted') {
+                        setIsStandaloneApp(true);
+                        setIsInstallModalOpen(false);
+                      }
+                    }}
+                    className="text-[10px] text-[#A9B8FF] hover:text-white underline font-sans"
+                  >
+                    Atau pasang instan WebAPK via Chrome di tablet ini &rarr;
+                  </button>
+                </div>
+              )}
             </div>
 
-            <div className="flex items-center justify-end gap-2">
+            {/* Tombol Tutup */}
+            <div className="flex items-center justify-end">
               <button
                 type="button"
                 onClick={() => setIsInstallModalOpen(false)}
-                className="w-full py-2.5 pixel-btn bg-[#00E599] hover:bg-[#5CE1E6] text-[#050C38] font-pixel-title font-bold text-xs active:scale-95 text-center"
+                className="w-full py-2.5 pixel-btn bg-[#E02F75] hover:bg-[#FE0168] text-white font-pixel-title font-bold text-xs active:scale-95 text-center"
               >
-                MENGERTI, SAYA COBA DI TABLET
+                TUTUP PANDUAN
               </button>
             </div>
           </div>

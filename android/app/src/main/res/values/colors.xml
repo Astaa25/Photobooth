@@ -1,0 +1,11 @@
+<resources>
+    <color name="bg_dark">#050C38</color>
+    <color name="box_dark">#0C1230</color>
+    <color name="border_blue">#4B57B2</color>
+    <color name="neon_yellow">#FFD84D</color>
+    <color name="neon_pink">#FE0168</color>
+    <color name="neon_cyan">#5CE1E6</color>
+    <color name="neon_green">#00E599</color>
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+</resources>

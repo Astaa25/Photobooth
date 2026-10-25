@@ -1,0 +1,75 @@
+name: Build Android APK Release
+
+on:
+  push:
+    branches: [ master, main ]
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    name: Build & Release Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build Android APK with Gradle
+        working-directory: ./android
+        run: |
+          gradle wrapper --gradle-version 8.5
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Verify APK Generated
+        run: |
+          ls -lah android/app/build/outputs/apk/release/
+          cp android/app/build/outputs/apk/release/photobooth-tablet-kiosk-release.apk ./photobooth-tablet-kiosk.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: photobooth-tablet-kiosk-apk
+          path: ./photobooth-tablet-kiosk.apk
+
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0
+          name: "Photobooth Tablet Kiosk APK v1.0.0"
+          draft: false
+          prerelease: false
+          body: |
+            ## 📱 Photobooth Tablet Kiosk - Release APK Android
+            
+            File APK ini dibuat khusus untuk tablet Android (seperti **Redmi Pad 2**) agar dapat berjalan secara mandiri sebagai aplikasi Kiosk layar penuh tanpa browser Chrome.
+
+            ### 🚀 Cara Pasang di Tablet (Redmi Pad 2):
+            1. Unduh file **`photobooth-tablet-kiosk.apk`** di bawah ini langsung dari tablet Anda.
+            2. Buka file APK yang sudah diunduh, lalu pilih **Pasang / Install** (izinkan "Instal aplikasi dari sumber tidak dikenal" jika diminta oleh MIUI/HyperOS).
+            3. Buka aplikasi **Photobooth Kiosk**.
+            4. Masukkan alamat IP laptop Anda (contoh: `http://192.168.1.5:3000/booth`).
+            5. Aplikasi akan langsung membuka layar bilik foto dalam mode Fullscreen Kiosk!
+
+            ### ✨ Keunggulan APK Kiosk:
+            - **Fullscreen 100%**: Tanpa address bar, tab bar, ataupun tombol navigasi Chrome yang mengganggu pengunjung.
+            - **Layar Selalu Menyala (No Sleep)**: Tablet tidak akan mati atau terkunci di tengah antrean pengunjung.
+            - **Izin Kamera Otomatis**: Kamera langsung aktif tanpa pop-up izin yang merepotkan.
+            - **Pengaturan IP Cepat**: Bisa ganti IP laptop kapan saja melalui tombol gear di pojok layar.
+          files: ./photobooth-tablet-kiosk.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

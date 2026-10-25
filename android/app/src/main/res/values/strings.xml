@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Photobooth Kiosk</string>
+    <string name="settings_title">Pengaturan Server Photobooth</string>
+    <string name="server_url_hint">http://192.168.1.5:3000/booth</string>
+    <string name="save_and_connect">Simpan &amp; Hubungkan</string>
+    <string name="cancel">Batal</string>
+    <string name="connecting">Menghubungkan ke Bilik Kios...</string>
+    <string name="connection_error">Gagal terhubung ke Server Laptop</string>
+    <string name="retry">Coba Lagi</string>
+    <string name="change_server">Ubah Alamat IP</string>
+</resources>
