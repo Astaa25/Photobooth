@@ -102,59 +102,119 @@ export async function requestWebcamStream(deviceId?: string): Promise<{
     throw new Error('Browser ini tidak mendukung akses kamera WebRTC atau berjalan di luar secure context (localhost/https).');
   }
 
-  // Lapisan 1: Coba resolusi ideal 1280x720 dengan facingMode user
-  const tier1Constraints: MediaStreamConstraints = {
-    audio: false,
-    video: {
-      deviceId: deviceId ? { exact: deviceId } : undefined,
-      facingMode: deviceId ? undefined : 'user',
-      width: { ideal: 1280 },
-      height: { ideal: 720 },
-    },
+  // 1. Baca daftar semua videoinput yang terdeteksi di sistem
+  let availableDevices: MediaDeviceInfo[] = [];
+  try {
+    const devs = await navigator.mediaDevices.enumerateDevices();
+    availableDevices = devs.filter((d) => d.kind === 'videoinput');
+  } catch (err) {
+    console.warn('Gagal membaca enumerateDevices:', err);
+  }
+
+  // 2. Susun daftar kandidat deviceId secara cerdas
+  const candidateDeviceIds: (string | undefined)[] = [];
+  if (deviceId && deviceId !== 'simulator-virtual-webcam') {
+    candidateDeviceIds.push(deviceId);
+  }
+
+  // Pengenal kamera virtual vs fisik
+  const isVirtualCam = (label: string) => {
+    const l = (label || '').toLowerCase();
+    return l.includes('iriun') || l.includes('obs') || l.includes('droidcam') || l.includes('virtual');
   };
 
-  // Lapisan 2: Coba tanpa facingMode (kompatibel desktop & generic webcam)
-  const tier2Constraints: MediaStreamConstraints = {
-    audio: false,
-    video: {
-      deviceId: deviceId ? { exact: deviceId } : undefined,
-      width: { ideal: 1280 },
-      height: { ideal: 720 },
-    },
+  const isPhysicalCam = (label: string) => {
+    const l = (label || '').toLowerCase();
+    return (
+      l.includes('uvc') ||
+      l.includes('usb') ||
+      l.includes('integrated') ||
+      l.includes('built-in') ||
+      l.includes('hd web') ||
+      l.includes('chicony') ||
+      l.includes('sunplus') ||
+      l.includes('realtek') ||
+      l.includes('bison')
+    ) && !isVirtualCam(label);
   };
 
-  // Lapisan 3: Coba hanya deviceId murni
-  const tier3Constraints: MediaStreamConstraints = {
-    audio: false,
-    video: deviceId ? { deviceId: { exact: deviceId } } : true,
-  };
+  // Prioritas 1: Kamera fisik yang dikenali (misal: USB2.0 HD UVC WebCam)
+  for (const cam of availableDevices) {
+    if (cam.deviceId && isPhysicalCam(cam.label) && !candidateDeviceIds.includes(cam.deviceId)) {
+      candidateDeviceIds.push(cam.deviceId);
+    }
+  }
 
-  // Lapisan 4: Fallback mutlak: video apa saja yang tersedia
-  const tier4Constraints: MediaStreamConstraints = {
-    audio: false,
-    video: true,
-  };
+  // Prioritas 2: Kamera lain yang bukan virtual (atau tanpa label)
+  for (const cam of availableDevices) {
+    if (cam.deviceId && !isVirtualCam(cam.label) && !candidateDeviceIds.includes(cam.deviceId)) {
+      candidateDeviceIds.push(cam.deviceId);
+    }
+  }
+
+  // Prioritas 3: Default browser device (undefined)
+  if (!candidateDeviceIds.includes(undefined)) {
+    candidateDeviceIds.push(undefined);
+  }
+
+  // Prioritas 4: Sisa kamera lainnya jika semua prioritas di atas gagal
+  for (const cam of availableDevices) {
+    if (cam.deviceId && !candidateDeviceIds.includes(cam.deviceId)) {
+      candidateDeviceIds.push(cam.deviceId);
+    }
+  }
 
   let lastError: any = null;
 
-  for (const constraints of [tier1Constraints, tier2Constraints, tier3Constraints, tier4Constraints]) {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      const videoTrack = stream.getVideoTracks()[0];
-      const settings = videoTrack?.getSettings?.();
-      const activeDeviceId = settings?.deviceId || deviceId;
-      const label = videoTrack?.label || 'Kamera Laptop HD';
+  for (const devId of candidateDeviceIds) {
+    const tiers: MediaStreamConstraints[] = devId
+      ? [
+          {
+            audio: false,
+            video: {
+              deviceId: { exact: devId },
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
+          },
+          {
+            audio: false,
+            video: {
+              deviceId: { exact: devId },
+            },
+          },
+        ]
+      : [
+          {
+            audio: false,
+            video: {
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
+          },
+          {
+            audio: false,
+            video: true,
+          },
+        ];
 
-      return {
-        stream,
-        activeDeviceId,
-        label,
-      };
-    } catch (err: any) {
-      lastError = err;
-      // Jika izin ditolak (NotAllowedError), hentikan loop agar tidak terus meneror user
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        throw err;
+    for (const constraints of tiers) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        const videoTrack = stream.getVideoTracks()[0];
+        const settings = videoTrack?.getSettings?.();
+        const activeDeviceId = settings?.deviceId || devId;
+        const label = videoTrack?.label || 'Kamera Laptop HD';
+
+        return {
+          stream,
+          activeDeviceId,
+          label,
+        };
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`Peringatan: Gagal membuka feed webcam (deviceId: ${devId || 'default'}):`, err?.name || err?.message || err);
+        // Teruskan ke kandidat atau tier berikutnya
       }
     }
   }

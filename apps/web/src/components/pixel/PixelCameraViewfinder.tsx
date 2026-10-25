@@ -17,6 +17,7 @@ interface PixelCameraViewfinderProps {
   isRetake?: boolean;
   cameraName?: string;
   cameraSource?: 'canon' | 'webcam';
+  selectedWebcamId?: string;
   onSwitchCamera?: (source: 'canon' | 'webcam') => void;
   onSnapshotCapture?: (dataUrl: string) => void;
 }
@@ -28,6 +29,7 @@ export function PixelCameraViewfinder({
   isRetake = false,
   cameraName = 'CANON EOS 1200D',
   cameraSource = 'canon',
+  selectedWebcamId,
   onSwitchCamera,
   onSnapshotCapture,
 }: PixelCameraViewfinderProps) {
@@ -39,7 +41,7 @@ export function PixelCameraViewfinder({
   const [isConnecting, setIsConnecting] = useState(false);
   const [webcamLabel, setWebcamLabel] = useState<string>('KAMERA LAPTOP HD');
   const [devices, setDevices] = useState<WebcamDeviceInfo[]>([]);
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>(selectedWebcamId || '');
 
   // Efek simulasi level audio VU meter 8-bit
   useEffect(() => {

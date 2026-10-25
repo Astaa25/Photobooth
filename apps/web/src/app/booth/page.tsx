@@ -217,6 +217,7 @@ export default function BoothKioskPage() {
   const handleUseSimulatorInModal = async () => {
     try {
       const sim = useSimulatorStream();
+      setSelectedWebcamId('simulator-virtual-webcam');
       setWebcamStatus('connected');
       setWebcamErrorMsg(null);
       if (testVideoRef.current) {
@@ -224,6 +225,30 @@ export default function BoothKioskPage() {
       }
       const devs = await enumerateVideoDevices().catch(() => []);
       setWebcamDevices(devs);
+    } catch (err: any) {
+      console.warn('Simulator error:', err);
+    }
+  };
+
+  // Beralih langsung ke mode simulator 30 FPS
+  const handleSwitchToSimulator = async () => {
+    setCameraSource('webcam');
+    setSelectedWebcamId('simulator-virtual-webcam');
+    try {
+      localStorage.setItem('photobooth_selected_camera', 'webcam');
+      localStorage.setItem('photobooth_selected_webcam_id', 'simulator-virtual-webcam');
+      const channel = new BroadcastChannel('photobooth_session_sync');
+      channel.postMessage({ type: 'CAMERA_CHANGED', cameraSource: 'webcam' });
+      channel.close();
+    } catch {}
+
+    try {
+      const sim = useSimulatorStream();
+      setWebcamStatus('connected');
+      setWebcamErrorMsg(null);
+      if (testVideoRef.current) {
+        await bindStreamToVideo(testVideoRef.current, sim.stream);
+      }
     } catch (err: any) {
       console.warn('Simulator error:', err);
     }
@@ -654,6 +679,19 @@ export default function BoothKioskPage() {
             >
               BUKA APLIKASI BOOTH
             </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsUnlocked(true);
+                sessionStorage.setItem('booth_kiosk_unlocked', 'true');
+                if (soundEnabled) retroAudio.playSuccessChime();
+              }}
+              suppressHydrationWarning
+              className="w-full h-10 pixel-btn bg-[#00E599] text-[#050C38] text-xs font-bold hover:bg-[#5CE1E6] mt-2 active:scale-95"
+            >
+              🚀 BUKA KIOS LANGSUNG (PIN: 1234)
+            </button>
           </form>
 
           <div className="mt-6 pt-4 border-t border-white/10 text-[11px] text-white/40">
@@ -860,12 +898,12 @@ export default function BoothKioskPage() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 mb-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2.5">
                 <button
                   type="button"
                   onClick={() => handleSwitchCamera('webcam')}
                   className={`p-2.5 pixel-btn text-left flex items-center gap-2 text-xs font-pixel-title transition-all active:scale-95 ${
-                    cameraSource === 'webcam'
+                    cameraSource === 'webcam' && selectedWebcamId !== 'simulator-virtual-webcam'
                       ? 'bg-[#5CE1E6] text-[#050C38] border-2 border-white font-bold shadow'
                       : 'bg-[#131947] text-white/70 hover:bg-[#160078]'
                   }`}
@@ -886,7 +924,58 @@ export default function BoothKioskPage() {
                   <Camera className="w-4 h-4 shrink-0" />
                   <span className="truncate">CANON 1200D</span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={handleSwitchToSimulator}
+                  className={`p-2.5 pixel-btn text-left flex items-center gap-2 text-xs font-pixel-title transition-all active:scale-95 ${
+                    cameraSource === 'webcam' && selectedWebcamId === 'simulator-virtual-webcam'
+                      ? 'bg-[#FFD84D] text-[#050C38] border-2 border-white font-bold shadow'
+                      : 'bg-[#131947] text-white/70 hover:bg-[#160078]'
+                  }`}
+                  title="Gunakan simulasi live feed virtual jika kamera fisik bermasalah"
+                >
+                  <Sparkles className="w-4 h-4 shrink-0 text-[#FE0168]" />
+                  <span className="truncate">SIMULATOR (30 FPS)</span>
+                </button>
               </div>
+
+              {/* Selector Device Kamera jika ada lebih dari 1 kamera (Misal ada Iriun & USB WebCam) */}
+              {cameraSource === 'webcam' && webcamDevices.length > 1 && (
+                <div className="mb-2.5 bg-[#0C1230] p-2 border border-[#4B57B2]/60">
+                  <label className="block text-[9px] font-pixel-title text-[#FFD84D] mb-1">
+                    PILIH PERANGKAT KAMERA (GANTI JIKA KAMERA IRIUN/UTAMA NONAKTIF):
+                  </label>
+                  <select
+                    value={selectedWebcamId}
+                    onChange={(e) => {
+                      const newDevId = e.target.value;
+                      setSelectedWebcamId(newDevId);
+                      if (newDevId === 'simulator-virtual-webcam') {
+                        handleSwitchToSimulator();
+                      } else {
+                        getSharedWebcamStream(newDevId, true)
+                          .then(() => {
+                            setWebcamStatus('connected');
+                            setWebcamErrorMsg(null);
+                          })
+                          .catch((err) => {
+                            setWebcamStatus('error');
+                            setWebcamErrorMsg(getHumanWebcamError(err));
+                          });
+                      }
+                    }}
+                    className="w-full bg-[#131947] border border-[#5CE1E6] text-xs text-white p-1.5 outline-none font-pixel"
+                  >
+                    {webcamDevices.map((d) => (
+                      <option key={d.deviceId} value={d.deviceId}>
+                        {d.label}
+                      </option>
+                    ))}
+                    <option value="simulator-virtual-webcam">🎭 Simulator Live 30 FPS</option>
+                  </select>
+                </div>
+              )}
 
               {/* Status & Tombol Uji Feed Kamera Laptop */}
               {cameraSource === 'webcam' && (
@@ -911,7 +1000,9 @@ export default function BoothKioskPage() {
                       }
                     >
                       {webcamStatus === 'connected'
-                        ? 'SIAP DIGUNAKAN'
+                        ? selectedWebcamId === 'simulator-virtual-webcam'
+                          ? 'SIMULATOR 30 FPS SIAP'
+                          : 'KAMERA SIAP DIGUNAKAN'
                         : webcamStatus === 'error'
                         ? 'KENDALA AKSES IZIN'
                         : 'MENGHUBUNGKAN...'}
@@ -931,16 +1022,30 @@ export default function BoothKioskPage() {
 
               {/* Pesan Error & Solusi jika Ada */}
               {cameraSource === 'webcam' && webcamStatus === 'error' && (
-                <div className="mt-2 p-2.5 bg-[#FE0168]/20 border border-[#FE0168] text-[10px] text-[#FFD84D] leading-tight font-sans">
-                  <p className="mb-2">{webcamErrorMsg || 'Browser belum mengizinkan akses kamera webcam.'}</p>
-                  <button
-                    type="button"
-                    onClick={handleUseSimulatorInModal}
-                    className="w-full py-1.5 pixel-btn bg-[#FFD84D] hover:bg-[#FFE57F] text-[#050C38] text-[9px] font-pixel-title font-bold flex items-center justify-center gap-1 shadow-sm active:scale-95"
-                  >
-                    <Sparkles className="w-3 h-3 text-[#E02F75]" />
-                    <span>🎭 AKTIFKAN SIMULATOR KAMERA (30 FPS)</span>
-                  </button>
+                <div className="mt-2 p-3 bg-[#FE0168]/20 border border-[#FE0168] text-[10px] text-white leading-relaxed font-sans space-y-2">
+                  <div className="text-[#FFD84D] font-bold flex items-center gap-1.5 font-pixel-title text-[9px]">
+                    <AlertTriangle className="w-3.5 h-3.5 text-[#FE0168] shrink-0" />
+                    <span>KAMERA LAPTOP BELUM DAPAT DIBUKA</span>
+                  </div>
+                  <p className="text-[10px] text-white/80">
+                    Jika Anda sudah klik <em>"Izinkan"</em> di Chrome, peramban mengharuskan Anda <strong>memuat ulang halaman (F5)</strong> untuk menerapkan izin tersebut. Periksa juga apakah software seperti <em>Iriun Webcam</em> yang nonaktif terpilih secara otomatis.
+                  </p>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => window.location.reload()}
+                      className="px-3 py-1.5 pixel-btn bg-[#00E599] hover:bg-[#5CE1E6] text-[#050C38] text-[9px] font-pixel-title font-bold active:scale-95"
+                    >
+                      🔄 MUAT ULANG HALAMAN (F5)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSwitchToSimulator}
+                      className="px-3 py-1.5 pixel-btn bg-[#FFD84D] hover:bg-[#FFE57F] text-[#050C38] text-[9px] font-pixel-title font-bold active:scale-95 shadow"
+                    >
+                      🎭 PAKAI SIMULATOR (30 FPS)
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -1107,6 +1212,7 @@ export default function BoothKioskPage() {
             isRetake={retakeIndex !== null}
             cameraName="CANON 1200D"
             cameraSource={cameraSource}
+            selectedWebcamId={selectedWebcamId}
             onSwitchCamera={handleSwitchCamera}
             onSnapshotCapture={(dataUrl) => {
               latestWebcamSnapshotRef.current = dataUrl;
@@ -1249,6 +1355,14 @@ export default function BoothKioskPage() {
                     </ol>
                   </div>
                   <div className="flex flex-wrap items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => window.location.reload()}
+                      className="px-3 py-1.5 pixel-btn bg-[#FFD84D] hover:bg-[#FFE57F] text-[#050C38] text-[10px] font-pixel-title font-bold flex items-center gap-1 active:scale-95 shadow"
+                      title="Terapkan perubahan izin Chrome dengan memuat ulang halaman"
+                    >
+                      🔄 MUAT ULANG (F5)
+                    </button>
                     <button
                       type="button"
                       onClick={handleOpenWebcamTest}

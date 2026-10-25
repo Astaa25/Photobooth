@@ -1,1 +1,52 @@
-[]
+[
+  {
+    "slug": "custom-1792868266680",
+    "name": "METROPOLITAN",
+    "desc": "4 foto 4R kustom",
+    "photoCount": 4,
+    "previewType": "grid",
+    "category": "Grid",
+    "tags": [
+      "grid",
+      "4 foto",
+      "cetak 4R"
+    ],
+    "bgColor": "#131947",
+    "order": 1,
+    "showInBooth": true,
+    "frameImage": "/uploads/frames/frame-1792868266680.png",
+    "isCustom": true,
+    "canvasWidth": 1200,
+    "canvasHeight": 1800,
+    "slots": [
+      {
+        "x": 50,
+        "y": 330,
+        "width": 530,
+        "height": 600,
+        "photo": 0
+      },
+      {
+        "x": 620,
+        "y": 330,
+        "width": 530,
+        "height": 600,
+        "photo": 1
+      },
+      {
+        "x": 50,
+        "y": 960,
+        "width": 530,
+        "height": 600,
+        "photo": 2
+      },
+      {
+        "x": 620,
+        "y": 960,
+        "width": 530,
+        "height": 600,
+        "photo": 3
+      }
+    ]
+  }
+]
