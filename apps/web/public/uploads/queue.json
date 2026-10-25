@@ -1,0 +1,50 @@
+[
+  {
+    "id": "1",
+    "number": "#001",
+    "nickname": "Diana",
+    "status": "IN_SESSION",
+    "registeredAt": "10:14",
+    "printCopies": 2
+  },
+  {
+    "id": "2",
+    "number": "#002",
+    "nickname": "Budi & Sari",
+    "status": "QUEUED",
+    "registeredAt": "10:18",
+    "printCopies": 1
+  },
+  {
+    "id": "3",
+    "number": "#003",
+    "nickname": "Kelompok 4 Wisuda",
+    "status": "QUEUED",
+    "registeredAt": "10:22",
+    "printCopies": 3
+  },
+  {
+    "id": "4",
+    "number": "#004",
+    "nickname": "Aris",
+    "status": "WAITING",
+    "registeredAt": "10:05",
+    "printCopies": 1
+  },
+  {
+    "id": "5",
+    "number": "#005",
+    "nickname": "Rani",
+    "status": "DONE",
+    "registeredAt": "09:55",
+    "printCopies": 2
+  },
+  {
+    "id": "6",
+    "number": "#006",
+    "nickname": "Keluarga Dosen TIK",
+    "status": "PRINT_ORDER",
+    "registeredAt": "10:30",
+    "printCopies": 2
+  }
+]

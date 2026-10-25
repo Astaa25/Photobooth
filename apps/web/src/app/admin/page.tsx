@@ -250,10 +250,31 @@ export default function AdminDashboardPage() {
   const adminWebcamVideoRef = useRef<HTMLVideoElement | null>(null);
   const adminWebcamStreamRef = useRef<MediaStream | null>(null);
 
-  // 1. Muat Kategori & Template Kustom dari Server & LocalStorage
+  // Helper Simpan Antrean ke LocalStorage & State
+  const persistQueue = (updater: (prev: QueueItem[]) => QueueItem[]) => {
+    setQueue((prev) => {
+      const next = updater(prev);
+      try {
+        localStorage.setItem('photobooth_admin_queue', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  // 1. Muat Antrean, Kategori & Template Kustom dari Database & LocalStorage
   useEffect(() => {
     try {
       setTotalPrintedSheets(getTotalPrintedSheets());
+
+      // Ambil antrean tersimpan di localStorage agar render instan tanpa kedip
+      const savedQueue = localStorage.getItem('photobooth_admin_queue');
+      if (savedQueue) {
+        const parsedQ = JSON.parse(savedQueue);
+        if (Array.isArray(parsedQ) && parsedQ.length > 0) {
+          setQueue(parsedQ);
+        }
+      }
+
       const savedCats = localStorage.getItem('photobooth_kanban_categories');
       if (savedCats) {
         const parsed = JSON.parse(savedCats);
@@ -264,6 +285,19 @@ export default function AdminDashboardPage() {
         setActiveCamera(savedCam);
       }
     } catch {}
+
+    // Ambil data antrean aktual dari API Server Database PostgreSQL / Disk Backup
+    fetch('/api/queue')
+      .then((res) => res.json())
+      .then((res) => {
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setQueue(res.data);
+          try {
+            localStorage.setItem('photobooth_admin_queue', JSON.stringify(res.data));
+          } catch {}
+        }
+      })
+      .catch((err) => console.warn('Gagal memuat /api/queue:', err));
 
     // Muat template dari API server /api/frames
     fetch('/api/frames')
@@ -295,13 +329,19 @@ export default function AdminDashboardPage() {
         // Pengunjung selesai berfoto di booth -> Otomatis pindah ke SELESAI
         if (event.data?.type === 'SESSION_COMPLETED') {
           const tNum = event.data.ticketNumber;
-          setQueue((prev) =>
+          persistQueue((prev) =>
             prev.map((item) =>
               item.number === tNum || item.status === 'IN_SESSION'
                 ? { ...item, status: 'DONE' }
                 : item
             )
           );
+          fetch('/api/queue', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ number: tNum, status: 'DONE' }),
+          }).catch(() => {});
+
           if (soundEnabled) retroAudio.playCoinSound();
           showToast(`Sesi foto ${event.data.visitorName || tNum} SELESAI & otomatis masuk kolom Selesai!`);
         }
@@ -309,10 +349,16 @@ export default function AdminDashboardPage() {
         // Tiket baru masuk dari /register
         if (event.data?.type === 'NEW_REGISTRATION' && event.data.item) {
           const newItem = event.data.item;
-          setQueue((prev) => {
+          persistQueue((prev) => {
             if (prev.some((q) => q.number === newItem.number)) return prev;
             return [newItem, ...prev];
           });
+          fetch('/api/queue', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newItem),
+          }).catch(() => {});
+
           if (soundEnabled) retroAudio.playSuccessChime();
           showToast(`Antrean baru masuk: ${newItem.nickname} (${newItem.number})`);
         }
@@ -446,23 +492,51 @@ export default function AdminDashboardPage() {
     showToast(`Template "${saved.name}" berhasil disimpan!`);
   };
 
-  // 3. Heartbeat Auto-Refresh Berkelanjutan (Selalu Loading & Sinkron Setiap 2.5 Detik)
+  // 3. Heartbeat Auto-Refresh Berkelanjutan (Sinkron dengan Database Setiap 3 Detik)
   useEffect(() => {
     const interval = setInterval(() => {
       setRefreshPulse((p) => (p + 1) % 100);
       setLastRefreshedAt(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
 
+      // Sinkronkan antrean dari API Database Server /api/queue
+      fetch('/api/queue')
+        .then((res) => res.json())
+        .then((res) => {
+          if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+            setQueue((prev) => {
+              const prevStr = JSON.stringify(prev);
+              const newStr = JSON.stringify(res.data);
+              if (prevStr !== newStr) {
+                try {
+                  localStorage.setItem('photobooth_admin_queue', newStr);
+                } catch {}
+                return res.data;
+              }
+              return prev;
+            });
+          }
+        })
+        .catch(() => {});
+
+      // Sinkronkan jika ada tiket pendaftaran lokal baru
       try {
         const raw = localStorage.getItem('photobooth_registered_tickets');
         if (raw) {
           const newTickets: QueueItem[] = JSON.parse(raw);
           if (Array.isArray(newTickets) && newTickets.length > 0) {
-            setQueue((prev) => {
+            persistQueue((prev) => {
               const existingIds = new Set(prev.map((q) => q.number));
               const additions = newTickets.filter((t) => !existingIds.has(t.number));
               if (additions.length > 0) {
                 if (soundEnabled) retroAudio.playSuccessChime();
                 showToast(`${additions.length} tiket baru disinkronkan otomatis!`);
+                for (const add of additions) {
+                  fetch('/api/queue', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(add),
+                  }).catch(() => {});
+                }
                 return [...additions, ...prev];
               }
               return prev;
@@ -470,7 +544,7 @@ export default function AdminDashboardPage() {
           }
         }
       } catch {}
-    }, 2500);
+    }, 3000);
 
     return () => clearInterval(interval);
   }, [soundEnabled]);
@@ -585,9 +659,21 @@ export default function AdminDashboardPage() {
       channel.close();
     } catch {}
 
-    setQueue((prev) =>
+    persistQueue((prev) =>
       prev.map((item) => (item.id === id ? { ...item, status: newStatus } : item))
     );
+
+    // Kirim sinkronisasi ke API Database Server PostgreSQL / Disk
+    fetch('/api/queue', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id,
+        number: targetItem?.number,
+        status: newStatus,
+      }),
+    }).catch(() => {});
+
     showToast(label);
   };
 
@@ -602,9 +688,14 @@ export default function AdminDashboardPage() {
     setTimeout(() => {
       setPrintingItem(null);
       showToast(`Cetak selesai untuk ${item.nickname}! (${copies} lembar 4R dicatat, total: ${updated})`);
-      setQueue((prev) =>
+      persistQueue((prev) =>
         prev.map((q) => (q.id === item.id ? { ...q, status: 'DONE' } : q))
       );
+      fetch('/api/queue', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.id, number: item.number, status: 'DONE' }),
+      }).catch(() => {});
     }, 2000);
   };
 
@@ -621,11 +712,29 @@ export default function AdminDashboardPage() {
       registeredAt: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
       printCopies: 1,
     };
-    setQueue((prev) => [newItem, ...prev]);
+    persistQueue((prev) => [newItem, ...prev]);
+    fetch('/api/queue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newItem),
+    }).catch(() => {});
+
     setNewVisitorNickname('');
     setIsAddingVisitor(false);
     if (soundEnabled) retroAudio.playSuccessChime();
     showToast(`Antrean ${nextNum} (${newItem.nickname}) berhasil ditambahkan!`);
+  };
+
+  // Hapus Antrean Tiket dari Database & Tampilan
+  const handleDeleteTicket = (item: QueueItem) => {
+    if (confirm(`Hapus antrean ${item.nickname} (${item.number}) dari sistem?`)) {
+      persistQueue((prev) => prev.filter((q) => q.id !== item.id && q.number !== item.number));
+      fetch(`/api/queue?id=${encodeURIComponent(item.id)}&number=${encodeURIComponent(item.number)}`, {
+        method: 'DELETE',
+      }).catch(() => {});
+      if (soundEnabled) retroAudio.playButtonClick();
+      showToast(`Antrean ${item.nickname} (${item.number}) berhasil dihapus.`);
+    }
   };
 
   // Reset counter lembar cetak
@@ -1200,7 +1309,17 @@ export default function AdminDashboardPage() {
                                 <span className="font-pixel-title text-xs sm:text-sm text-[#FFD84D]">
                                   {item.number}
                                 </span>
-                                <span className="text-[9px] text-white/50 shrink-0">{item.registeredAt}</span>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <span className="text-[9px] text-white/50">{item.registeredAt}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteTicket(item)}
+                                    className="p-0.5 text-white/30 hover:text-[#FE0168] transition-colors"
+                                    title="Hapus tiket antrean ini"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                </div>
                               </div>
 
                               <p className="font-bold text-white text-[11px] sm:text-xs mb-2.5 truncate" title={item.nickname}>
