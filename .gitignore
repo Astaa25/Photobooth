@@ -44,3 +44,11 @@ Thumbs.db
 
 # Folder web photobooth lama (referensi)
 photobooth-tik-main/
+
+# Android Kiosk
+android/.gradle/
+android/build/
+android/*/build/
+android/local.properties
+android/*.apk
+
