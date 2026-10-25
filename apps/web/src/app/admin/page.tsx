@@ -109,6 +109,18 @@ const DEFAULT_TEMPLATES: CustomTemplate[] = [
     photoCount: 4,
     previewType: 'strip',
     frameImage: '/assets/frames/night-city-strip.png',
+    canvasWidth: 1200,
+    canvasHeight: 1800,
+    slots: [
+      { x: 40, y: 250, width: 520, height: 330, photo: 0 },
+      { x: 640, y: 250, width: 520, height: 330, photo: 0 },
+      { x: 40, y: 605, width: 520, height: 330, photo: 1 },
+      { x: 640, y: 605, width: 520, height: 330, photo: 1 },
+      { x: 40, y: 960, width: 520, height: 330, photo: 2 },
+      { x: 640, y: 960, width: 520, height: 330, photo: 2 },
+      { x: 40, y: 1315, width: 520, height: 330, photo: 3 },
+      { x: 640, y: 1315, width: 520, height: 330, photo: 3 },
+    ],
   },
   {
     slug: 'night-city-grid',
@@ -117,6 +129,14 @@ const DEFAULT_TEMPLATES: CustomTemplate[] = [
     photoCount: 4,
     previewType: 'grid',
     frameImage: '/assets/frames/night-city-grid.png',
+    canvasWidth: 1200,
+    canvasHeight: 1800,
+    slots: [
+      { x: 50, y: 330, width: 530, height: 600, photo: 0 },
+      { x: 620, y: 330, width: 530, height: 600, photo: 1 },
+      { x: 50, y: 960, width: 530, height: 600, photo: 2 },
+      { x: 620, y: 960, width: 530, height: 600, photo: 3 },
+    ],
   },
   {
     slug: 'moonlight-trio',
@@ -125,6 +145,16 @@ const DEFAULT_TEMPLATES: CustomTemplate[] = [
     photoCount: 3,
     previewType: 'trio',
     frameImage: '/assets/frames/moonlight-trio.png',
+    canvasWidth: 1200,
+    canvasHeight: 1800,
+    slots: [
+      { x: 40, y: 250, width: 520, height: 450, photo: 0 },
+      { x: 640, y: 250, width: 520, height: 450, photo: 0 },
+      { x: 40, y: 725, width: 520, height: 450, photo: 1 },
+      { x: 640, y: 725, width: 520, height: 450, photo: 1 },
+      { x: 40, y: 1200, width: 520, height: 450, photo: 2 },
+      { x: 640, y: 1200, width: 520, height: 450, photo: 2 },
+    ],
   },
   {
     slug: 'duo-skyline',
@@ -133,6 +163,12 @@ const DEFAULT_TEMPLATES: CustomTemplate[] = [
     photoCount: 2,
     previewType: 'duo',
     frameImage: '/assets/frames/duo-skyline.png',
+    canvasWidth: 1200,
+    canvasHeight: 1800,
+    slots: [
+      { x: 50, y: 260, width: 1100, height: 620, photo: 0 },
+      { x: 50, y: 920, width: 1100, height: 620, photo: 1 },
+    ],
   },
   {
     slug: 'poster-tunggal',
@@ -141,6 +177,11 @@ const DEFAULT_TEMPLATES: CustomTemplate[] = [
     photoCount: 1,
     previewType: 'single',
     frameImage: '/assets/frames/poster-tunggal.png',
+    canvasWidth: 1200,
+    canvasHeight: 1800,
+    slots: [
+      { x: 50, y: 260, width: 1100, height: 1200, photo: 0 },
+    ],
   },
 ];
 

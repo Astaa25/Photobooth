@@ -124,48 +124,47 @@ function drawColorCard(
  */
 export function getDefaultSlots(photoCount: number, width = 1200, height = 1800): PhotoSlotConfig[] {
   if (photoCount === 4) {
-    // Format Dual Strip Photobooth (2 Kolom x 4 Baris = 8 slot)
-    const slotW = 480;
-    const slotH = 295;
-    const colLeftX = 75;
-    const colRightX = 645;
-    const startY = 125;
-    const gapY = 70;
+    // Format Dual Strip Photobooth (2 Kolom x 4 Baris = 8 slot, presisi night-city-strip & metropolitan)
+    const slotW = 520;
+    const slotH = 330;
+    const colLeftX = 40;
+    const colRightX = 640;
+    const yPositions = [250, 605, 960, 1315];
 
     const slots: PhotoSlotConfig[] = [];
     for (let row = 0; row < 4; row++) {
-      const y = startY + row * (slotH + gapY);
-      slots.push({ x: colLeftX, y, width: slotW, height: slotH, photo: row });
-      slots.push({ x: colRightX, y, width: slotW, height: slotH, photo: row });
+      slots.push({ x: colLeftX, y: yPositions[row], width: slotW, height: slotH, photo: row });
+      slots.push({ x: colRightX, y: yPositions[row], width: slotW, height: slotH, photo: row });
     }
     return slots;
   }
 
   if (photoCount === 3) {
-    // Format 3 Foto Strip Vertikal
-    const slotW = 1000;
-    const slotH = 430;
-    const x = 100;
-    return [
-      { x, y: 140, width: slotW, height: slotH, photo: 0 },
-      { x, y: 640, width: slotW, height: slotH, photo: 1 },
-      { x, y: 1140, width: slotW, height: slotH, photo: 2 },
-    ];
+    // Format Dual Strip 3 Foto (2 Kolom x 3 Baris = 6 slot, presisi moonlight-trio)
+    const slotW = 520;
+    const slotH = 450;
+    const colLeftX = 40;
+    const colRightX = 640;
+    const yPositions = [250, 725, 1200];
+
+    const slots: PhotoSlotConfig[] = [];
+    for (let row = 0; row < 3; row++) {
+      slots.push({ x: colLeftX, y: yPositions[row], width: slotW, height: slotH, photo: row });
+      slots.push({ x: colRightX, y: yPositions[row], width: slotW, height: slotH, photo: row });
+    }
+    return slots;
   }
 
   if (photoCount === 2) {
-    // Format 2 Foto
-    const slotW = 1000;
-    const slotH = 660;
-    const x = 100;
+    // Format 2 Foto Bertingkat Seimbang (presisi duo-skyline)
     return [
-      { x, y: 170, width: slotW, height: slotH, photo: 0 },
-      { x, y: 920, width: slotW, height: slotH, photo: 1 },
+      { x: 50, y: 260, width: 1100, height: 620, photo: 0 },
+      { x: 50, y: 920, width: 1100, height: 620, photo: 1 },
     ];
   }
 
-  // Format 1 Foto Poster Tunggal
-  return [{ x: 80, y: 140, width: 1040, height: 1400, photo: 0 }];
+  // Format 1 Foto Poster Tunggal (presisi poster-tunggal)
+  return [{ x: 50, y: 260, width: 1100, height: 1200, photo: 0 }];
 }
 
 /**

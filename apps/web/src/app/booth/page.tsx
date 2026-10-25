@@ -69,6 +69,18 @@ const TEMPLATES: TemplateOption[] = [
     photoCount: 4,
     previewType: 'strip',
     frameImage: '/assets/frames/night-city-strip.png',
+    canvasWidth: 1200,
+    canvasHeight: 1800,
+    slots: [
+      { x: 40, y: 250, width: 520, height: 330, photo: 0 },
+      { x: 640, y: 250, width: 520, height: 330, photo: 0 },
+      { x: 40, y: 605, width: 520, height: 330, photo: 1 },
+      { x: 640, y: 605, width: 520, height: 330, photo: 1 },
+      { x: 40, y: 960, width: 520, height: 330, photo: 2 },
+      { x: 640, y: 960, width: 520, height: 330, photo: 2 },
+      { x: 40, y: 1315, width: 520, height: 330, photo: 3 },
+      { x: 640, y: 1315, width: 520, height: 330, photo: 3 },
+    ],
   },
   {
     slug: 'night-city-grid',
@@ -77,6 +89,14 @@ const TEMPLATES: TemplateOption[] = [
     photoCount: 4,
     previewType: 'grid',
     frameImage: '/assets/frames/night-city-grid.png',
+    canvasWidth: 1200,
+    canvasHeight: 1800,
+    slots: [
+      { x: 50, y: 330, width: 530, height: 600, photo: 0 },
+      { x: 620, y: 330, width: 530, height: 600, photo: 1 },
+      { x: 50, y: 960, width: 530, height: 600, photo: 2 },
+      { x: 620, y: 960, width: 530, height: 600, photo: 3 },
+    ],
   },
   {
     slug: 'moonlight-trio',
@@ -85,6 +105,16 @@ const TEMPLATES: TemplateOption[] = [
     photoCount: 3,
     previewType: 'trio',
     frameImage: '/assets/frames/moonlight-trio.png',
+    canvasWidth: 1200,
+    canvasHeight: 1800,
+    slots: [
+      { x: 40, y: 250, width: 520, height: 450, photo: 0 },
+      { x: 640, y: 250, width: 520, height: 450, photo: 0 },
+      { x: 40, y: 725, width: 520, height: 450, photo: 1 },
+      { x: 640, y: 725, width: 520, height: 450, photo: 1 },
+      { x: 40, y: 1200, width: 520, height: 450, photo: 2 },
+      { x: 640, y: 1200, width: 520, height: 450, photo: 2 },
+    ],
   },
   {
     slug: 'duo-skyline',
@@ -93,6 +123,12 @@ const TEMPLATES: TemplateOption[] = [
     photoCount: 2,
     previewType: 'duo',
     frameImage: '/assets/frames/duo-skyline.png',
+    canvasWidth: 1200,
+    canvasHeight: 1800,
+    slots: [
+      { x: 50, y: 260, width: 1100, height: 620, photo: 0 },
+      { x: 50, y: 920, width: 1100, height: 620, photo: 1 },
+    ],
   },
   {
     slug: 'poster-tunggal',
@@ -101,6 +137,11 @@ const TEMPLATES: TemplateOption[] = [
     photoCount: 1,
     previewType: 'single',
     frameImage: '/assets/frames/poster-tunggal.png',
+    canvasWidth: 1200,
+    canvasHeight: 1800,
+    slots: [
+      { x: 50, y: 260, width: 1100, height: 1200, photo: 0 },
+    ],
   },
 ];
 
@@ -127,11 +168,16 @@ export default function BoothKioskPage() {
   const [webcamErrorMsg, setWebcamErrorMsg] = useState<string | null>(null);
   const latestWebcamSnapshotRef = useRef<string | null>(null);
 
-  // State Modal Uji Live Feed Webcam Laptop
+  // State Modal Uji Live Feed Webcam Laptop & Canon DSLR
   const [isWebcamModalOpen, setIsWebcamModalOpen] = useState(false);
   const [testSnapshotUrl, setTestSnapshotUrl] = useState<string | null>(null);
   const [webcamDevices, setWebcamDevices] = useState<WebcamDeviceInfo[]>([]);
   const [selectedWebcamId, setSelectedWebcamId] = useState<string>('');
+  const [canonApiStatus, setCanonApiStatus] = useState<{ connected: boolean; cameraName: string }>({
+    connected: false,
+    cameraName: 'Canon EOS 1200D',
+  });
+  const [isScanningCanon, setIsScanningCanon] = useState(false);
   const testVideoRef = useRef<HTMLVideoElement | null>(null);
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const [dynamicCardWidth, setDynamicCardWidth] = useState<number>(360);
@@ -239,9 +285,45 @@ export default function BoothKioskPage() {
     }
   };
 
+  // Pindai dan uji status koneksi Canon DSLR (via digiCamControl & Canon EOS Webcam Utility)
+  const scanAndCheckCanon = async () => {
+    setIsScanningCanon(true);
+    try {
+      // 1. Pindai API digiCamControl di laptop (port 5513)
+      const res = await fetch('/api/canon');
+      const json = await res.json();
+      if (json && json.success) {
+        setCanonApiStatus({
+          connected: json.connected,
+          cameraName: json.cameraName || 'Canon EOS 1200D',
+        });
+        if (json.connected) {
+          handleSwitchCamera('canon');
+        }
+      }
+
+      // 2. Pindai apakah ada Canon EOS Webcam Utility di perangkat video browser
+      const devs = await enumerateVideoDevices();
+      setWebcamDevices(devs);
+      const canonDev = devs.find((d) =>
+        d.label.toLowerCase().includes('canon') ||
+        d.label.toLowerCase().includes('eos') ||
+        d.label.toLowerCase().includes('utility')
+      );
+      if (canonDev && cameraSource === 'webcam') {
+        setSelectedWebcamId(canonDev.deviceId);
+      }
+    } catch (err) {
+      console.warn('Gagal memindai status Canon:', err);
+    } finally {
+      setIsScanningCanon(false);
+    }
+  };
+
   // Buka modal uji kamera dan pasangkan feed langsung jika mode webcam
   const handleOpenWebcamTest = async () => {
     setIsWebcamModalOpen(true);
+    scanAndCheckCanon().catch(() => {});
     if (cameraSource === 'webcam') {
       try {
         const res = await getSharedWebcamStream(selectedWebcamId || undefined);
@@ -976,45 +1058,42 @@ export default function BoothKioskPage() {
 
           {/* Tombol Opsi Sumber Kamera (Canon DSLR vs Laptop Webcam) & Uji */}
           <div className="flex items-center gap-1.5">
+            {/* Tombol Hubungkan / Status Canon Langsung di Navbar */}
             <button
               type="button"
-              onClick={handleOpenWebcamTest}
-              className={`flex items-center gap-1.5 px-3 py-1.5 bg-[#131947] hover:bg-[#160078] border-2 text-[11px] font-pixel-title transition-all active:scale-95 ${
-                cameraSource === 'webcam' && webcamStatus === 'error'
-                  ? 'border-[#FE0168] text-[#FE0168]'
-                  : cameraSource === 'webcam' && webcamStatus === 'connected'
-                  ? 'border-[#00E599] text-[#00E599]'
-                  : 'border-[#4B57B2] text-[#5CE1E6]'
+              onClick={() => {
+                handleOpenWebcamTest();
+                scanAndCheckCanon();
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 border-2 text-[11px] font-pixel-title transition-all active:scale-95 shadow-sm ${
+                cameraSource === 'canon'
+                  ? 'bg-[#00E599]/20 border-[#00E599] text-[#00E599] hover:bg-[#00E599]/30'
+                  : 'bg-[#131947] hover:bg-[#160078] border-[#FFD84D] text-[#FFD84D] animate-pulse'
               }`}
-              title="Pengaturan Sumber Kamera (Canon DSLR / Laptop Webcam / Simulator)"
+              title="Hubungkan & Uji Kamera Canon EOS 1200D"
             >
-              {cameraSource === 'webcam' ? (
-                <>
-                  <Laptop className="w-3.5 h-3.5" />
-                  <span>
-                    KAMERA: {selectedWebcamId === 'simulator-virtual-webcam' ? 'SIMULATOR' : 'LAPTOP'}{' '}
-                    {webcamStatus === 'connected'
-                      ? '● SIAP'
-                      : webcamStatus === 'error'
-                      ? '● KENDALA'
-                      : '● CEK'}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <Camera className="w-3.5 h-3.5 text-[#00E599]" />
-                  <span className="text-[#00E599]">KAMERA: CANON 1200D</span>
-                </>
-              )}
+              <Camera className="w-4 h-4 text-[#00E599]" />
+              <span>
+                {cameraSource === 'canon'
+                  ? 'CANON 1200D ● AKTIF'
+                  : 'HUBUNGKAN CANON'}
+              </span>
             </button>
 
+            {/* Tombol Pilihan Sumber Kamera (Laptop / Simulator / Uji) */}
             <button
               type="button"
               onClick={handleOpenWebcamTest}
-              className="px-2.5 py-1.5 bg-[#6700A3] hover:bg-[#FE0168] border-2 border-[#5CE1E6] text-white text-[10px] font-pixel-title active:scale-95 flex items-center gap-1"
-              title="Buka Pengaturan & Uji Feed Kamera"
+              className={`px-2.5 py-1.5 bg-[#131947] hover:bg-[#160078] border-2 text-[10px] font-pixel-title active:scale-95 flex items-center gap-1 ${
+                cameraSource === 'webcam' ? 'border-[#5CE1E6] text-[#5CE1E6]' : 'border-white/20 text-white/60'
+              }`}
+              title="Buka Pengaturan Kamera & Live Feed"
             >
-              <span>UJI</span>
+              <Laptop className="w-3.5 h-3.5" />
+              <span>
+                {selectedWebcamId === 'simulator-virtual-webcam' ? 'SIMULATOR' : 'WEBCAM'}{' '}
+                {webcamStatus === 'connected' ? '●' : '○'}
+              </span>
             </button>
           </div>
 
@@ -1702,20 +1781,47 @@ export default function BoothKioskPage() {
               </>
             ) : (
               /* KONTEN JIKA MODE CANON 1200D AKTIF */
-              <div className="bg-[#050C38] border-2 border-[#00E599] p-5 text-center mb-3">
-                <div className="w-12 h-12 bg-[#00E599]/20 border border-[#00E599] text-[#00E599] flex items-center justify-center mx-auto mb-3">
-                  <Camera className="w-6 h-6" />
+              <div className="bg-[#050C38] border-2 border-[#00E599] p-4 text-center mb-3">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <div className="w-10 h-10 bg-[#00E599]/20 border border-[#00E599] text-[#00E599] flex items-center justify-center">
+                    <Camera className="w-5 h-5" />
+                  </div>
+                  <div className="text-left">
+                    <h4 className="font-pixel-title text-xs text-[#00E599]">
+                      KAMERA CANON EOS 1200D
+                    </h4>
+                    <span className="text-[10px] text-[#A9B8FF] flex items-center gap-1 font-mono">
+                      <span className={`w-2 h-2 rounded-full ${canonApiStatus.connected ? 'bg-[#00E599] animate-pulse' : 'bg-[#FFD84D]'}`} />
+                      {canonApiStatus.connected
+                        ? `TERHUBUNG: ${canonApiStatus.cameraName}`
+                        : 'KABEL USB TERSAMBUNG KE LAPTOP'}
+                    </span>
+                  </div>
                 </div>
-                <h4 className="font-pixel-title text-xs text-[#00E599] mb-1">
-                  KAMERA CANON EOS 1200D (API LANGSUNG KE TABLET)
-                </h4>
-                <p className="text-[11px] text-white/80 max-w-sm mx-auto mb-3 font-sans leading-relaxed">
-                  Tablet terhubung ke API Canon DSLR. Tekan tombol uji di bawah untuk memicu rana kamera Canon dan melihat hasil jepretan uji coba.
-                </p>
+
+                {/* Panduan 2 Opsi Koneksi Canon */}
+                <div className="my-3 p-2.5 bg-[#0C1230] border border-[#4B57B2] text-left text-[10px] font-sans space-y-2">
+                  <div className="border-b border-white/10 pb-1.5">
+                    <p className="font-bold text-[#FFD84D] font-pixel-title text-[9px] mb-0.5">
+                      💡 CARA 1 (LIVE FEED DI LAYAR - EOS WEBCAM UTILITY):
+                    </p>
+                    <p className="text-white/80 leading-relaxed">
+                      Jalankan software <span className="text-[#00E599] font-bold">Canon EOS Webcam Utility</span> di laptop. Klik tab <strong>&quot;KAMERA LAPTOP&quot;</strong> di atas lalu pilih <em>EOS Webcam Utility</em>. Feed live Canon langsung tampil di layar tablet!
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-bold text-[#FFD84D] font-pixel-title text-[9px] mb-0.5">
+                      ⚡ CARA 2 (SHUTTER &amp; FLASH FISIK DSLR - DIGICAMCONTROL):
+                    </p>
+                    <p className="text-white/80 leading-relaxed">
+                      Nyalakan kamera Canon (mode Manual/P/Av), buka software <span className="text-[#00E599] font-bold">digiCamControl</span> di laptop. Rana &amp; flash fisik Canon akan menjepret otomatis saat countdown 0!
+                    </p>
+                  </div>
+                </div>
 
                 {/* Pratinjau Snapshot Uji Coba Canon jika ada */}
                 {testSnapshotUrl && (
-                  <div className="w-52 aspect-[4/3] mx-auto border-2 border-[#FFD84D] mb-4 bg-black overflow-hidden shadow-lg relative">
+                  <div className="w-56 aspect-[4/3] mx-auto border-2 border-[#FFD84D] mb-3 bg-black overflow-hidden shadow-lg relative">
                     <img src={testSnapshotUrl} alt="Hasil Snapshot Canon" className="w-full h-full object-cover" />
                     <span className="absolute bottom-1 right-1 bg-black/80 text-[#00E599] text-[8px] font-pixel-title px-1 border border-[#00E599]/40">
                       HASIL UJI CANON
@@ -1723,7 +1829,17 @@ export default function BoothKioskPage() {
                   </div>
                 )}
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={scanAndCheckCanon}
+                    disabled={isScanningCanon}
+                    className="py-2 px-3 pixel-btn bg-[#131947] hover:bg-[#160078] text-[#5CE1E6] text-[10px] font-pixel-title border border-[#4B57B2] active:scale-95 flex items-center justify-center gap-1"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isScanningCanon ? 'animate-spin' : ''}`} />
+                    <span>PINDAI ULANG</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={async () => {
@@ -1743,16 +1859,16 @@ export default function BoothKioskPage() {
                         alert('Gagal menguji API Canon');
                       }
                     }}
-                    className="flex-1 py-2.5 pixel-btn bg-[#FFD84D] hover:bg-[#FFE57F] text-[#050C38] text-xs font-pixel-title font-bold flex items-center justify-center gap-1.5 active:scale-95 shadow"
+                    className="flex-1 py-2 pixel-btn bg-[#FFD84D] hover:bg-[#FFE57F] text-[#050C38] text-[10px] font-pixel-title font-bold flex items-center justify-center gap-1 active:scale-95 shadow"
                   >
-                    <Camera className="w-4 h-4 text-[#050C38]" />
-                    <span>📸 TES JEPRET CANON API</span>
+                    <Camera className="w-3.5 h-3.5 text-[#050C38]" />
+                    <span>📸 TES JEPRET CANON</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setIsWebcamModalOpen(false)}
-                    className="px-4 py-2.5 pixel-btn bg-[#00E599] hover:bg-[#5CE1E6] text-[#050C38] text-xs font-pixel-title font-bold active:scale-95"
+                    className="py-2 px-3 pixel-btn bg-[#00E599] hover:bg-[#5CE1E6] text-[#050C38] text-[10px] font-pixel-title font-bold active:scale-95"
                   >
                     GUNAKAN CANON
                   </button>
