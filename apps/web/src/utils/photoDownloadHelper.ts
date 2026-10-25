@@ -244,26 +244,7 @@ export async function downloadCompositePhotoStrip(options: CompositeDownloadOpti
     }
   }
 
-  // 5. Watermark Footer Elegan
-  ctx.save();
-  ctx.fillStyle = 'rgba(5, 12, 56, 0.85)';
-  ctx.fillRect(20, canvasHeight - 48, canvasWidth - 40, 36);
-  ctx.strokeStyle = '#4B57B2';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(20, canvasHeight - 48, canvasWidth - 40, 36);
-
-  ctx.fillStyle = '#FFD84D';
-  ctx.font = 'bold 15px monospace';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(`TIK 2026 • ${visitorName.toUpperCase()} (${ticketNumber})`, 40, canvasHeight - 30);
-
-  ctx.fillStyle = '#5CE1E6';
-  ctx.textAlign = 'right';
-  ctx.fillText(templateName.toUpperCase(), canvasWidth - 40, canvasHeight - 30);
-  ctx.restore();
-
-  // 6. Konversi ke DataURL JPEG dan unduh
+  // 5. Konversi ke DataURL JPEG dan unduh tanpa watermark footer
   const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
   triggerFileDownload(dataUrl, fileName);
   return dataUrl;

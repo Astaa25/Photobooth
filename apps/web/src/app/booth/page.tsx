@@ -21,6 +21,10 @@ import {
   Play,
   ChevronLeft,
   ChevronRight,
+  Copy,
+  Tablet,
+  Wifi,
+  Usb,
 } from 'lucide-react';
 import { retroAudio } from '@/utils/audio';
 import {
@@ -178,6 +182,10 @@ export default function BoothKioskPage() {
     cameraName: 'Canon EOS 1200D',
   });
   const [isScanningCanon, setIsScanningCanon] = useState(false);
+  const [tabletConnectionInfo, setTabletConnectionInfo] = useState<{ laptopIp?: string; tabletBoothUrl?: string }>({});
+  const [tabletUsbStatus, setTabletUsbStatus] = useState<{ connected: boolean; deviceName?: string; error?: string } | null>(null);
+  const [activeCanonTab, setActiveCanonTab] = useState<'wireless-tablet' | 'usb-otg' | 'laptop-host'>('wireless-tablet');
+  const [isCopiedUrl, setIsCopiedUrl] = useState(false);
   const testVideoRef = useRef<HTMLVideoElement | null>(null);
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const [dynamicCardWidth, setDynamicCardWidth] = useState<number>(360);
@@ -285,11 +293,11 @@ export default function BoothKioskPage() {
     }
   };
 
-  // Pindai dan uji status koneksi Canon DSLR (via digiCamControl & Canon EOS Webcam Utility)
+  // Pindai dan uji status koneksi Canon DSLR (via digiCamControl, Wi-Fi Tablet, & EOS Webcam Utility)
   const scanAndCheckCanon = async () => {
     setIsScanningCanon(true);
     try {
-      // 1. Pindai API digiCamControl di laptop (port 5513)
+      // 1. Pindai API digiCamControl & info alamat IP laptop untuk tablet
       const res = await fetch('/api/canon');
       const json = await res.json();
       if (json && json.success) {
@@ -297,18 +305,26 @@ export default function BoothKioskPage() {
           connected: json.connected,
           cameraName: json.cameraName || 'Canon EOS 1200D',
         });
+        if (json.laptopIp || json.tabletBoothUrl) {
+          setTabletConnectionInfo({
+            laptopIp: json.laptopIp,
+            tabletBoothUrl: json.tabletBoothUrl,
+          });
+        }
         if (json.connected) {
           handleSwitchCamera('canon');
         }
       }
 
-      // 2. Pindai apakah ada Canon EOS Webcam Utility di perangkat video browser
+      // 2. Pindai apakah ada Canon EOS Webcam Utility atau Capture Card di perangkat video browser
       const devs = await enumerateVideoDevices();
       setWebcamDevices(devs);
       const canonDev = devs.find((d) =>
         d.label.toLowerCase().includes('canon') ||
         d.label.toLowerCase().includes('eos') ||
-        d.label.toLowerCase().includes('utility')
+        d.label.toLowerCase().includes('utility') ||
+        d.label.toLowerCase().includes('video capture') ||
+        d.label.toLowerCase().includes('cam link')
       );
       if (canonDev && cameraSource === 'webcam') {
         setSelectedWebcamId(canonDev.deviceId);
@@ -318,6 +334,55 @@ export default function BoothKioskPage() {
     } finally {
       setIsScanningCanon(false);
     }
+  };
+
+  // Hubungkan langsung kabel USB OTG Canon di tablet via WebUSB (Chrome Android)
+  const handleConnectWebUsb = async () => {
+    if (typeof navigator !== 'undefined' && 'usb' in navigator) {
+      try {
+        setTabletUsbStatus(null);
+        const device = await (navigator as any).usb.requestDevice({
+          filters: [{ vendorId: 0x04a9 }], // Vendor ID Canon Inc.
+        });
+        if (device) {
+          await device.open().catch(() => {});
+          const devName = device.productName || 'Canon EOS 1200D';
+          setTabletUsbStatus({
+            connected: true,
+            deviceName: devName,
+          });
+          setCanonApiStatus({
+            connected: true,
+            cameraName: `${devName} (USB OTG Tablet)`,
+          });
+          handleSwitchCamera('canon');
+          if (soundEnabled) retroAudio.playSuccessChime();
+        }
+      } catch (err: any) {
+        console.warn('WebUSB request error:', err);
+        setTabletUsbStatus({
+          connected: false,
+          error:
+            err?.name === 'SecurityError'
+              ? 'Izin akses USB ditolak browser.'
+              : err?.message || 'Pastikan aplikasi Camera Connect & Control sudah ditutup dari Recent Apps agar port USB tidak terkunci.',
+        });
+      }
+    } else {
+      alert('Fitur WebUSB memerlukan Google Chrome di Android atau Desktop.');
+    }
+  };
+
+  // Salin alamat URL booth laptop untuk dibuka di tablet
+  const handleCopyTabletUrl = () => {
+    const url = tabletConnectionInfo.tabletBoothUrl || `http://${window.location.hostname}:3000/booth`;
+    navigator.clipboard?.writeText(url).then(() => {
+      setIsCopiedUrl(true);
+      if (soundEnabled) retroAudio.playSuccessChime();
+      setTimeout(() => setIsCopiedUrl(false), 2500);
+    }).catch(() => {
+      prompt('Salin tautan ini untuk dibuka di tablet:', url);
+    });
   };
 
   // Buka modal uji kamera dan pasangkan feed langsung jika mode webcam
@@ -1781,47 +1846,166 @@ export default function BoothKioskPage() {
               </>
             ) : (
               /* KONTEN JIKA MODE CANON 1200D AKTIF */
-              <div className="bg-[#050C38] border-2 border-[#00E599] p-4 text-center mb-3">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <div className="w-10 h-10 bg-[#00E599]/20 border border-[#00E599] text-[#00E599] flex items-center justify-center">
-                    <Camera className="w-5 h-5" />
+              <div className="bg-[#050C38] border-2 border-[#00E599] p-3 sm:p-4 text-center mb-3">
+                {/* Header Status Kamera Canon */}
+                <div className="flex items-center justify-between gap-2 mb-3 bg-[#0C1230] p-2.5 border border-[#4B57B2]/60">
+                  <div className="flex items-center gap-2">
+                    <div className="w-9 h-9 bg-[#00E599]/20 border border-[#00E599] text-[#00E599] flex items-center justify-center shrink-0">
+                      <Camera className="w-5 h-5" />
+                    </div>
+                    <div className="text-left">
+                      <h4 className="font-pixel-title text-xs text-[#00E599]">
+                        KAMERA CANON EOS 1200D
+                      </h4>
+                      <span className="text-[10px] text-[#A9B8FF] flex items-center gap-1 font-mono">
+                        <span className={`w-2 h-2 rounded-full ${canonApiStatus.connected ? 'bg-[#00E599] animate-pulse' : 'bg-[#FFD84D]'}`} />
+                        {canonApiStatus.connected
+                          ? `AKTIF: ${canonApiStatus.cameraName}`
+                          : 'STANDBY (PILIH METODE KONEKSI DI BAWAH)'}
+                      </span>
+                    </div>
                   </div>
-                  <div className="text-left">
-                    <h4 className="font-pixel-title text-xs text-[#00E599]">
-                      KAMERA CANON EOS 1200D
-                    </h4>
-                    <span className="text-[10px] text-[#A9B8FF] flex items-center gap-1 font-mono">
-                      <span className={`w-2 h-2 rounded-full ${canonApiStatus.connected ? 'bg-[#00E599] animate-pulse' : 'bg-[#FFD84D]'}`} />
-                      {canonApiStatus.connected
-                        ? `TERHUBUNG: ${canonApiStatus.cameraName}`
-                        : 'KABEL USB TERSAMBUNG KE LAPTOP'}
-                    </span>
-                  </div>
+
+                  <span className="px-2 py-1 bg-[#131947] border border-[#FFD84D]/40 text-[#FFD84D] text-[9px] font-pixel-title hidden sm:inline-block">
+                    DSLR 18.0 MP
+                  </span>
                 </div>
 
-                {/* Panduan 2 Opsi Koneksi Canon */}
-                <div className="my-3 p-2.5 bg-[#0C1230] border border-[#4B57B2] text-left text-[10px] font-sans space-y-2">
-                  <div className="border-b border-white/10 pb-1.5">
-                    <p className="font-bold text-[#FFD84D] font-pixel-title text-[9px] mb-0.5">
-                      💡 CARA 1 (LIVE FEED DI LAYAR - EOS WEBCAM UTILITY):
-                    </p>
-                    <p className="text-white/80 leading-relaxed">
-                      Jalankan software <span className="text-[#00E599] font-bold">Canon EOS Webcam Utility</span> di laptop. Klik tab <strong>&quot;KAMERA LAPTOP&quot;</strong> di atas lalu pilih <em>EOS Webcam Utility</em>. Feed live Canon langsung tampil di layar tablet!
-                    </p>
-                  </div>
-                  <div>
-                    <p className="font-bold text-[#FFD84D] font-pixel-title text-[9px] mb-0.5">
-                      ⚡ CARA 2 (SHUTTER &amp; FLASH FISIK DSLR - DIGICAMCONTROL):
-                    </p>
-                    <p className="text-white/80 leading-relaxed">
-                      Nyalakan kamera Canon (mode Manual/P/Av), buka software <span className="text-[#00E599] font-bold">digiCamControl</span> di laptop. Rana &amp; flash fisik Canon akan menjepret otomatis saat countdown 0!
-                    </p>
-                  </div>
+                {/* Tab Pilihan Metode Koneksi Canon & Tablet */}
+                <div className="grid grid-cols-3 gap-1 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => setActiveCanonTab('wireless-tablet')}
+                    className={`py-1.5 px-1 text-[9px] font-pixel-title flex flex-col items-center justify-center gap-0.5 border transition-all ${
+                      activeCanonTab === 'wireless-tablet'
+                        ? 'bg-[#FFD84D] text-[#050C38] border-white font-bold shadow'
+                        : 'bg-[#131947] text-white/70 border-[#4B57B2] hover:bg-[#160078]'
+                    }`}
+                  >
+                    <Wifi className="w-3.5 h-3.5" />
+                    <span className="truncate">1. BUKA DI TABLET</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveCanonTab('usb-otg')}
+                    className={`py-1.5 px-1 text-[9px] font-pixel-title flex flex-col items-center justify-center gap-0.5 border transition-all ${
+                      activeCanonTab === 'usb-otg'
+                        ? 'bg-[#00E599] text-[#050C38] border-white font-bold shadow'
+                        : 'bg-[#131947] text-white/70 border-[#4B57B2] hover:bg-[#160078]'
+                    }`}
+                  >
+                    <Usb className="w-3.5 h-3.5" />
+                    <span className="truncate">2. USB OTG TABLET</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveCanonTab('laptop-host')}
+                    className={`py-1.5 px-1 text-[9px] font-pixel-title flex flex-col items-center justify-center gap-0.5 border transition-all ${
+                      activeCanonTab === 'laptop-host'
+                        ? 'bg-[#5CE1E6] text-[#050C38] border-white font-bold shadow'
+                        : 'bg-[#131947] text-white/70 border-[#4B57B2] hover:bg-[#160078]'
+                    }`}
+                  >
+                    <Laptop className="w-3.5 h-3.5" />
+                    <span className="truncate">3. HOST LAPTOP</span>
+                  </button>
                 </div>
+
+                {/* Konten Tab 1: Alur Bilik Nirkabel Tablet (Rekomendasi Standar Photobooth) */}
+                {activeCanonTab === 'wireless-tablet' && (
+                  <div className="bg-[#0C1230] p-3 border border-[#FFD84D]/60 text-left text-[10px] font-sans space-y-2.5">
+                    <div className="flex items-center gap-1.5 text-[#FFD84D] font-pixel-title text-[10px]">
+                      <Tablet className="w-4 h-4 text-[#FFD84D]" />
+                      <span>CARA MEMBUKA APLIKASI DI TABLET (REKOMENDASI TERBAIK):</span>
+                    </div>
+                    <p className="text-white/80 leading-relaxed">
+                      Kamera Canon dicolok dengan kabel USB ke Laptop. Tablet Anda cukup menjadi layar sentuh bilik photobooth tanpa kabel menjuntai!
+                    </p>
+
+                    <div className="bg-[#050C38] p-2 border border-[#4B57B2] flex items-center justify-between gap-2">
+                      <div className="truncate font-mono text-xs text-[#00E599]">
+                        {tabletConnectionInfo.tabletBoothUrl || `http://192.168.110.93:3000/booth`}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleCopyTabletUrl}
+                        className="px-2.5 py-1 pixel-btn bg-[#FFD84D] hover:bg-[#FFE57F] text-[#050C38] text-[9px] font-pixel-title font-bold shrink-0 flex items-center gap-1"
+                      >
+                        <Copy className="w-3 h-3" />
+                        <span>{isCopiedUrl ? 'TERSALIN! ✓' : 'SALIN LINK'}</span>
+                      </button>
+                    </div>
+
+                    <ol className="list-decimal list-inside text-white/75 space-y-1 pl-1">
+                      <li>Pastikan Tablet dan Laptop terhubung ke Wi-Fi / Hotspot yang sama.</li>
+                      <li>Buka Google Chrome di tablet, lalu ketik alamat link di atas.</li>
+                      <li>Aplikasi bilik foto langsung aktif di tablet, dan saat hitungan mundur selesai, kamera Canon di laptop otomatis menjepret!</li>
+                    </ol>
+                  </div>
+                )}
+
+                {/* Konten Tab 2: USB OTG Tablet & Solusi "Camera Connect & Control" */}
+                {activeCanonTab === 'usb-otg' && (
+                  <div className="bg-[#0C1230] p-3 border border-[#00E599]/60 text-left text-[10px] font-sans space-y-2.5">
+                    <div className="flex items-center gap-1.5 text-[#00E599] font-pixel-title text-[10px]">
+                      <Usb className="w-4 h-4 text-[#00E599]" />
+                      <span>KONEKSI KABEL USB OTG LANGSUNG KE TABLET:</span>
+                    </div>
+
+                    <div className="p-2 bg-[#FE0168]/15 border border-[#FE0168]/60 text-white/90 leading-relaxed">
+                      <p className="font-bold text-[#FFD84D] font-pixel-title text-[9px] mb-1">
+                        ⚠️ PENTING TENTANG &quot;CAMERA CONNECT &amp; CONTROL&quot;:
+                      </p>
+                      <p>
+                        Aplikasi <em>Camera Connect &amp; Control</em> di Android mengunci port USB secara eksklusif. Agar aplikasi web kita di Chrome bisa mengakses kamera Canon:
+                      </p>
+                      <ul className="list-disc list-inside mt-1 space-y-0.5 text-[9.5px]">
+                        <li>Buka <strong>Recent Apps</strong> di tablet Anda, lalu <strong>tutup / swipe close</strong> aplikasi <em>Camera Connect &amp; Control</em>.</li>
+                        <li>Pastikan kamera Canon dalam posisi ON.</li>
+                        <li>Klik tombol hijau di bawah ini, lalu pilih <strong>&quot;OK / Izinkan&quot;</strong> pada popup izin Android.</li>
+                      </ul>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleConnectWebUsb}
+                      className="w-full py-2.5 pixel-btn bg-[#00E599] hover:bg-[#5CE1E6] text-[#050C38] text-[10px] font-pixel-title font-bold flex items-center justify-center gap-1.5 active:scale-95 shadow"
+                    >
+                      <Usb className="w-4 h-4 text-[#050C38]" />
+                      <span>HUBUNGKAN CANON KE TABLET (WebUSB)</span>
+                    </button>
+
+                    {tabletUsbStatus && (
+                      <div className={`p-2 border text-[9.5px] font-mono ${tabletUsbStatus.connected ? 'bg-[#00E599]/20 border-[#00E599] text-[#00E599]' : 'bg-[#FE0168]/20 border-[#FE0168] text-[#FFD84D]'}`}>
+                        {tabletUsbStatus.connected
+                          ? `✓ Sukses Terhubung: ${tabletUsbStatus.deviceName}`
+                          : `✕ ${tabletUsbStatus.error}`}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Konten Tab 3: Host Laptop & digiCamControl */}
+                {activeCanonTab === 'laptop-host' && (
+                  <div className="bg-[#0C1230] p-3 border border-[#5CE1E6]/60 text-left text-[10px] font-sans space-y-2">
+                    <div className="flex items-center gap-1.5 text-[#5CE1E6] font-pixel-title text-[10px]">
+                      <Laptop className="w-4 h-4 text-[#5CE1E6]" />
+                      <span>KONTROL RANA FISIK VIA DIGICAMCONTROL DI LAPTOP:</span>
+                    </div>
+                    <p className="text-white/80 leading-relaxed">
+                      Hubungkan Canon ke port USB Laptop. Buka software gratis <span className="text-[#00E599] font-bold">digiCamControl</span> (server port 5513). Rana fisik dan lampu flash kamera Canon akan menyala otomatis saat berfoto.
+                    </p>
+                    <div className="p-1.5 bg-[#050C38] border border-white/10 text-[9px] text-[#A9B8FF] font-mono">
+                      Status digiCamControl: <span className={canonApiStatus.connected ? 'text-[#00E599] font-bold' : 'text-[#FFD84D]'}>{canonApiStatus.connected ? 'Online ✓' : 'Belum Terdeteksi (Pastikan software dibuka)'}</span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Pratinjau Snapshot Uji Coba Canon jika ada */}
                 {testSnapshotUrl && (
-                  <div className="w-56 aspect-[4/3] mx-auto border-2 border-[#FFD84D] mb-3 bg-black overflow-hidden shadow-lg relative">
+                  <div className="w-56 aspect-[4/3] mx-auto border-2 border-[#FFD84D] my-3 bg-black overflow-hidden shadow-lg relative">
                     <img src={testSnapshotUrl} alt="Hasil Snapshot Canon" className="w-full h-full object-cover" />
                     <span className="absolute bottom-1 right-1 bg-black/80 text-[#00E599] text-[8px] font-pixel-title px-1 border border-[#00E599]/40">
                       HASIL UJI CANON
@@ -1829,7 +2013,8 @@ export default function BoothKioskPage() {
                   </div>
                 )}
 
-                <div className="flex flex-wrap items-center gap-2 pt-1">
+                {/* Tombol Aksi Bawah */}
+                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-white/10">
                   <button
                     type="button"
                     onClick={scanAndCheckCanon}

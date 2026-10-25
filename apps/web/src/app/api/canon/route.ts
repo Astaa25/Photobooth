@@ -1,9 +1,41 @@
 import { NextResponse } from 'next/server';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 const DIGICAM_BASE_URL = process.env.DIGICAM_BASE_URL || 'http://127.0.0.1:5513';
 const CAPTURES_DIR = path.resolve(process.cwd(), 'public/uploads/captures');
+
+// Cari alamat IP Wi-Fi / LAN laptop agar tablet bisa langsung membuka alamat URL booth
+function getLocalIp(): string {
+  try {
+    const interfaces = os.networkInterfaces();
+    const candidates: { name: string; ip: string; priority: number }[] = [];
+
+    for (const [name, netList] of Object.entries(interfaces)) {
+      if (!netList) continue;
+      for (const net of netList) {
+        if (net.family === 'IPv4' && !net.internal) {
+          let priority = 1;
+          const lower = name.toLowerCase();
+          if (lower.includes('wi-fi') || lower.includes('wlan') || lower.includes('wireless')) {
+            priority = 10;
+          } else if (lower.includes('ethernet') || lower.includes('lan')) {
+            priority = 8;
+          } else if (lower.includes('virtual') || lower.includes('vmnet') || lower.includes('vbox') || lower.includes('wsl')) {
+            priority = 0;
+          }
+          candidates.push({ name, ip: net.address, priority });
+        }
+      }
+    }
+
+    candidates.sort((a, b) => b.priority - a.priority);
+    return candidates.length > 0 ? candidates[0].ip : '127.0.0.1';
+  } catch {
+    return '127.0.0.1';
+  }
+}
 
 // Pastikan folder captures tersedia
 if (!fs.existsSync(CAPTURES_DIR)) {
@@ -50,7 +82,7 @@ function generateFallbackCanonPhoto(photoIndex: number, visitorName = 'Pengunjun
   const theme = palettes[photoIndex % palettes.length];
   const now = new Date().toLocaleTimeString('id-ID');
 
-  // Buat SVG 1200x900 (rasio 4:3) lalu encode ke Data URL
+  // Buat SVG 1200x900 (rasio 4:3) tanpa watermark footer yang mengganggu bingkai
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900">
       <defs>
@@ -87,15 +119,6 @@ function generateFallbackCanonPhoto(photoIndex: number, visitorName = 'Pengunjun
       <text x="100" y="108" fill="${theme.text}" font-family="monospace, sans-serif" font-weight="bold" font-size="24">
         📷 CANON EOS 1200D &bull; ${theme.pose}
       </text>
-
-      <!-- Watermark Info -->
-      <rect x="80" y="770" width="1040" height="60" fill="rgba(0,0,0,0.6)" rx="4"/>
-      <text x="100" y="808" fill="#FFFFFF" font-family="monospace, sans-serif" font-size="20">
-        EXPO WISUDA TIK 2026 &bull; ${visitorName} &bull; ${now} WIB
-      </text>
-      <text x="1080" y="808" text-anchor="end" fill="${theme.accent}" font-family="monospace, sans-serif" font-weight="bold" font-size="20">
-        SENSOR 18.0 MP RAW
-      </text>
     </svg>
   `;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
@@ -103,14 +126,17 @@ function generateFallbackCanonPhoto(photoIndex: number, visitorName = 'Pengunjun
 
 /**
  * GET /api/canon
- * Status koneksi kamera Canon DSLR via digiCamControl
+ * Status koneksi kamera Canon DSLR via digiCamControl & info alamat IP tablet
  */
 export async function GET() {
   const status = await checkCanonStatus();
+  const laptopIp = getLocalIp();
   return NextResponse.json({
     success: true,
     ...status,
     digicamUrl: DIGICAM_BASE_URL,
+    laptopIp,
+    tabletBoothUrl: `http://${laptopIp}:3000/booth`,
     timestamp: Date.now(),
   });
 }

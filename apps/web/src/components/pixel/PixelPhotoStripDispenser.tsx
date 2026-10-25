@@ -209,10 +209,6 @@ export function PixelPhotoStripDispenser({
                   className="absolute inset-0 w-full h-full object-contain pixel-art pointer-events-none z-10"
                 />
               )}
-
-              <span className="absolute bottom-1 right-1.5 z-20 text-[6px] sm:text-[7px] font-pixel-title text-[#FFD84D] bg-black/70 px-1 border border-[#FFD84D]/30 truncate max-w-[90%]">
-                {visitorName} ({ticketNumber})
-              </span>
             </div>
           </div>
         </div>
