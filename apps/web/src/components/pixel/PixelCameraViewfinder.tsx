@@ -79,7 +79,6 @@ export function PixelCameraViewfinder({
       setDevices(devList);
     } catch (err: any) {
       console.warn('Status koneksi webcam/cermin viewfinder:', err?.name || err?.message || err);
-      // Jika mode canon, jangan tampilkan error blocking merah karena jepret utama via sensor Canon
       if (cameraSource === 'webcam') {
         setHasWebcamStream(false);
         setWebcamError(getHumanWebcamError(err));
@@ -149,7 +148,10 @@ export function PixelCameraViewfinder({
           ctx.strokeStyle = 'rgba(92, 225, 230, 0.2)';
           ctx.lineWidth = 1;
           for (let x = 0; x < 1280; x += 40) {
-            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 720); ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, 720);
+            ctx.stroke();
           }
 
           ctx.strokeStyle = '#FFD84D';
@@ -413,4 +415,3 @@ export function PixelCameraViewfinder({
     </div>
   );
 }
-
