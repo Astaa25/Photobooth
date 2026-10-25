@@ -171,7 +171,7 @@ export default function BoothKioskPage() {
   const [retakeIndex, setRetakeIndex] = useState<number | null>(null);
   const [capturedPhotos, setCapturedPhotos] = useState<string[]>([]);
   const [isFlashActive, setIsFlashActive] = useState(false);
-  const [cameraSource, setCameraSource] = useState<'canon' | 'webcam'>('webcam');
+  const [cameraSource, setCameraSource] = useState<'canon' | 'webcam'>('canon');
   const [webcamStatus, setWebcamStatus] = useState<'idle' | 'connected' | 'error'>('idle');
   const [webcamErrorMsg, setWebcamErrorMsg] = useState<string | null>(null);
   const latestWebcamSnapshotRef = useRef<string | null>(null);
@@ -296,7 +296,7 @@ export default function BoothKioskPage() {
         if (savedCam === 'canon' || savedCam === 'webcam') {
           setCameraSource(savedCam);
         } else {
-          setCameraSource('webcam');
+          setCameraSource('canon');
         }
       } catch {}
     }
@@ -306,6 +306,15 @@ export default function BoothKioskPage() {
         document.body.style.overflow = '';
       }
     };
+  }, []);
+
+  // Pindai otomatis status koneksi kamera Canon ke laptop secara berkala
+  useEffect(() => {
+    scanAndCheckCanon();
+    const interval = setInterval(() => {
+      scanAndCheckCanon();
+    }, 6000);
+    return () => clearInterval(interval);
   }, []);
 
   // Uji koneksi webcam laptop di latar belakang menggunakan singleton stream
@@ -692,9 +701,9 @@ export default function BoothKioskPage() {
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (step === 'countdown') {
-      // Jika mode kamera laptop aktif tapi belum terhubung, tahan countdown agar tidak memotret layar kosong
+      // Jika mode kamera laptop aktif tapi belum terhubung, alihkan otomatis ke simulator agar alur tidak macet
       if (cameraSource === 'webcam' && webcamStatus !== 'connected') {
-        return;
+        handleSwitchToSimulator().catch(() => {});
       }
 
       if (countdownNum > 0) {
@@ -1125,7 +1134,9 @@ export default function BoothKioskPage() {
               }}
               className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 border-2 text-[10px] font-pixel-title transition-all active:scale-95 shadow-sm shrink-0 whitespace-nowrap ${
                 cameraSource === 'canon'
-                  ? 'bg-[#00E599]/20 border-[#00E599] text-[#00E599] hover:bg-[#00E599]/30'
+                  ? canonApiStatus.connected
+                    ? 'bg-[#00E599]/20 border-[#00E599] text-[#00E599] hover:bg-[#00E599]/30'
+                    : 'bg-[#FFD84D]/20 border-[#FFD84D] text-[#FFD84D] hover:bg-[#FFD84D]/30'
                   : 'bg-[#131947] hover:bg-[#160078] border-[#FFD84D] text-[#FFD84D] animate-pulse'
               }`}
               title="Hubungkan & Uji Kamera Canon EOS 1200D"
@@ -1133,7 +1144,9 @@ export default function BoothKioskPage() {
               <Camera className="w-3.5 h-3.5 text-[#00E599]" />
               <span>
                 {cameraSource === 'canon'
-                  ? 'CANON 1200D ● AKTIF'
+                  ? canonApiStatus.connected
+                    ? 'CANON 1200D ● ONLINE'
+                    : 'CANON ● STANDBY'
                   : 'HUBUNGKAN CANON'}
               </span>
             </button>
@@ -1620,7 +1633,8 @@ export default function BoothKioskPage() {
             currentPhotoIdx={currentPhotoIdx}
             totalPhotos={retakeIndex !== null ? 1 : selectedTemplate.photoCount}
             isRetake={retakeIndex !== null}
-            cameraName="CANON 1200D"
+            cameraName={canonApiStatus.cameraName || 'CANON EOS 1200D'}
+            canonConnected={canonApiStatus.connected}
             cameraSource={cameraSource}
             selectedWebcamId={selectedWebcamId}
             onSwitchCamera={handleSwitchCamera}

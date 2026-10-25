@@ -16,6 +16,7 @@ interface PixelCameraViewfinderProps {
   totalPhotos: number;
   isRetake?: boolean;
   cameraName?: string;
+  canonConnected?: boolean;
   cameraSource?: 'canon' | 'webcam';
   selectedWebcamId?: string;
   onSwitchCamera?: (source: 'canon' | 'webcam') => void;
@@ -28,6 +29,7 @@ export function PixelCameraViewfinder({
   totalPhotos,
   isRetake = false,
   cameraName = 'CANON EOS 1200D',
+  canonConnected = false,
   cameraSource = 'canon',
   selectedWebcamId,
   onSwitchCamera,
@@ -53,8 +55,6 @@ export function PixelCameraViewfinder({
 
   // Fungsi penghubung kamera laptop yang tangguh dengan fallback bertingkat
   const connectWebcam = async (targetDeviceId?: string) => {
-    if (cameraSource !== 'webcam') return;
-
     setIsConnecting(true);
     setWebcamError(null);
 
@@ -78,9 +78,12 @@ export function PixelCameraViewfinder({
       const devList = await enumerateVideoDevices();
       setDevices(devList);
     } catch (err: any) {
-      console.warn('Status koneksi webcam laptop:', err?.name || err?.message || err);
-      setHasWebcamStream(false);
-      setWebcamError(getHumanWebcamError(err));
+      console.warn('Status koneksi webcam/cermin viewfinder:', err?.name || err?.message || err);
+      // Jika mode canon, jangan tampilkan error blocking merah karena jepret utama via sensor Canon
+      if (cameraSource === 'webcam') {
+        setHasWebcamStream(false);
+        setWebcamError(getHumanWebcamError(err));
+      }
     } finally {
       setIsConnecting(false);
     }
@@ -105,14 +108,9 @@ export function PixelCameraViewfinder({
     }
   };
 
-  // Aktifkan feed video saat mode webcam dipilih
+  // Hubungkan live preview mirror baik di mode webcam maupun mode Canon (cermin untuk pose)
   useEffect(() => {
-    if (cameraSource === 'webcam') {
-      connectWebcam();
-    } else {
-      setHasWebcamStream(false);
-      setWebcamError(null);
-    }
+    connectWebcam();
   }, [cameraSource]);
 
   // Ambil snapshot foto dari video webcam saat countdown mencapai 0
@@ -178,42 +176,74 @@ export function PixelCameraViewfinder({
 
   const activeDeviceLabel = cameraSource === 'webcam' ? webcamLabel : cameraName;
 
+  const poses = [
+    { title: 'POSE 1: SENYUM TERBAIK', tip: 'Tatap lurus ke kamera DSLR Canon' },
+    { title: 'POSE 2: GAYA BEBAS', tip: 'Ekspresikan kegembiraan wisuda' },
+    { title: 'POSE 3: FINGER HEART', tip: 'Bentuk hati kecil dengan jempol & telunjuk' },
+    { title: 'POSE 4: SELEBRASI', tip: 'Angkat tangan atau lempar toga wisuda' },
+  ];
+  const currentPose = poses[currentPhotoIdx % poses.length];
+
   return (
     <div className="relative w-full aspect-[4/3] max-w-2xl mx-auto bg-black/90 pixel-box border-4 border-[#4B57B2] flex flex-col items-center justify-center overflow-hidden select-none font-pixel">
-      {/* 0. Live Video Feed dari Kamera Laptop (Jika Mode Webcam Aktif) */}
-      {cameraSource === 'webcam' && (
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          className={`absolute inset-0 w-full h-full object-cover scale-x-[-1] z-0 transition-opacity duration-300 ${
-            hasWebcamStream ? 'opacity-90' : 'opacity-0'
-          }`}
-        />
+      {/* 0. Live Video Feed Cermin (Berfungsi untuk Webcam & Pratinjau Cermin Canon) */}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
+        className={`absolute inset-0 w-full h-full object-cover scale-x-[-1] z-0 transition-opacity duration-300 ${
+          hasWebcamStream ? 'opacity-90' : 'opacity-0'
+        }`}
+      />
+
+      {/* 0A. Latar Studio Retro Animasi jika Cermin Video Belum Terhubung */}
+      {!hasWebcamStream && (
+        <div className="absolute inset-0 z-0 bg-gradient-to-b from-[#0C1230] via-[#160078] to-[#050C38] flex flex-col items-center justify-center p-6 text-center">
+          {/* Animasi Siluet Karakter Posing */}
+          <div className="relative mb-3 flex flex-col items-center animate-pulse">
+            <div className="w-20 h-20 rounded-full border-4 border-[#FFD84D] bg-[#050C38]/80 flex items-center justify-center shadow-[0_0_20px_rgba(255,216,77,0.3)]">
+              <Camera className="w-10 h-10 text-[#00E599]" />
+            </div>
+            <div className="mt-2 text-[#5CE1E6] font-pixel-title text-xs tracking-wider">
+              {currentPose.title}
+            </div>
+            <div className="text-[10px] text-white/70 font-sans mt-0.5">
+              {currentPose.tip}
+            </div>
+          </div>
+
+          {/* Status Badge Koneksi Canon DSLR */}
+          <div className="bg-black/60 border border-[#4B57B2] px-3 py-1.5 flex items-center gap-2 max-w-md">
+            <span className={`w-2.5 h-2.5 rounded-full ${canonConnected ? 'bg-[#00E599]' : 'bg-[#FFD84D]'} animate-ping`} />
+            <span className="text-[10px] text-white/90 font-mono">
+              {canonConnected ? 'DSLR CANON 1200D ONLINE (Rana Fisik Aktif)' : 'CANON STANDBY • Colokkan kabel USB kamera ke Laptop & Nyalakan'}
+            </span>
+          </div>
+        </div>
       )}
 
-      {/* 0B. State Menghubungkan Kamera Laptop */}
+      {/* 0B. State Menghubungkan Kamera */}
       {cameraSource === 'webcam' && isConnecting && !hasWebcamStream && (
         <div className="absolute inset-0 z-15 flex flex-col items-center justify-center bg-black/85 p-6 text-center">
           <RefreshCw className="w-10 h-10 text-[#5CE1E6] animate-spin mb-3" />
           <p className="font-pixel-title text-xs text-[#5CE1E6] tracking-wider mb-1">
-            MENGHUBUNGKAN KE KAMERA LAPTOP...
+            MENGHUBUNGKAN KE KAMERA...
           </p>
           <p className="text-[10px] text-white/70 max-w-sm">
-            Mohon izinkan akses kamera pada jendela popup browser jika diminta.
+            Mohon izinkan akses kamera jika diminta, atau gunakan simulator.
           </p>
         </div>
       )}
 
-      {/* 0C. State Error / Belum Terhubung (Instruksi Jelas & Solutif) */}
+      {/* 0C. State Error / Belum Terhubung di Mode Webcam Murni */}
       {cameraSource === 'webcam' && webcamError && !hasWebcamStream && (
         <div className="absolute inset-3 z-25 flex flex-col items-center justify-center bg-[#0C1230]/95 border-2 border-[#FE0168] p-4 text-center my-auto shadow-[0_0_30px_rgba(254,1,104,0.4)]">
           <div className="w-10 h-10 bg-[#FE0168]/20 border border-[#FE0168] text-[#FE0168] flex items-center justify-center mb-2">
             <VideoOff className="w-5 h-5 animate-pulse" />
           </div>
           <h3 className="font-pixel-title text-xs sm:text-sm text-[#FFD84D] mb-1.5">
-            IZIN KAMERA DIBLOKIR / BELUM TERHUBUNG
+            KAMERA WEBCAM BELUM TERSEDIA
           </h3>
           <p className="text-[11px] text-white/85 mb-3 max-w-md leading-relaxed font-sans bg-black/50 p-2 border border-white/10">
             {webcamError}
@@ -222,20 +252,12 @@ export function PixelCameraViewfinder({
           <div className="flex flex-wrap items-center justify-center gap-2">
             <button
               type="button"
-              onClick={() => connectWebcam()}
-              className="px-3 py-1.5 pixel-btn bg-[#00E599] hover:bg-[#5CE1E6] text-[#050C38] text-[10px] font-pixel-title font-bold flex items-center gap-1.5 shadow-sm active:scale-95"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>COBA HUBUNGKAN LAGI</span>
-            </button>
-            <button
-              type="button"
               onClick={handleUseSimulator}
-              className="px-3 py-1.5 pixel-btn bg-[#E02F75] hover:bg-[#FE0168] text-white text-[10px] font-pixel-title font-bold flex items-center gap-1.5 shadow-sm active:scale-95"
+              className="px-3 py-1.5 pixel-btn bg-[#00E599] hover:bg-[#5CE1E6] text-[#050C38] text-[10px] font-pixel-title font-bold flex items-center gap-1.5 shadow-sm active:scale-95"
               title="Gunakan simulasi live camera 30 FPS untuk mencoba sesi booth"
             >
-              <Sparkles className="w-3.5 h-3.5 text-[#FFD84D]" />
-              <span>GUNAKAN SIMULATOR KAMERA</span>
+              <Sparkles className="w-3.5 h-3.5 text-[#050C38]" />
+              <span>GUNAKAN SIMULATOR KAMERA (30 FPS)</span>
             </button>
             {onSwitchCamera && (
               <button
@@ -244,7 +266,7 @@ export function PixelCameraViewfinder({
                 className="px-3 py-1.5 pixel-btn bg-[#131947] hover:bg-[#160078] text-[#FFD84D] text-[10px] font-pixel-title flex items-center gap-1.5 border border-[#4B57B2] active:scale-95"
               >
                 <Camera className="w-3.5 h-3.5 text-[#00E599]" />
-                <span>GANTI KE CANON 1200D</span>
+                <span>GANTI KE CANON 1200D (DSLR)</span>
               </button>
             )}
           </div>

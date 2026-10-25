@@ -448,12 +448,16 @@ export async function getSharedWebcamStream(
     activeSimulatorCleanup = null;
   }
 
-  const result = await requestWebcamStream(deviceId);
-  activeSharedStream = result.stream;
-  activeSharedDeviceId = result.activeDeviceId;
-  activeSharedLabel = result.label || 'Kamera Laptop HD';
-
-  return result;
+  try {
+    const result = await requestWebcamStream(deviceId);
+    activeSharedStream = result.stream;
+    activeSharedDeviceId = result.activeDeviceId;
+    activeSharedLabel = result.label || 'Kamera Laptop HD';
+    return result;
+  } catch (err: any) {
+    console.warn('Gagal membuka webcam hardware (biasanya karena HTTP di tablet), beralih ke simulator stream:', err?.message || err);
+    return useSimulatorStream();
+  }
 }
 
 /**
