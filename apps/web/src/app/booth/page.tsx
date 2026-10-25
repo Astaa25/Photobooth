@@ -1014,95 +1014,10 @@ export default function BoothKioskPage() {
   }
 
   // =========================================================================
-  // 1. TAMPILAN TERKUNCI (Jika Dibuka Tanpa PIN Operator)
-  // =========================================================================
-  if (!isUnlocked) {
-    return (
-      <div className="w-screen h-screen bg-[#050C38] text-white flex flex-col items-center justify-center p-6 relative select-none overflow-hidden font-pixel" suppressHydrationWarning>
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#160078] via-[#050C38] to-[#010030] pointer-events-none" />
-        <div className="absolute inset-0 bg-[url('/assets/pixel/stars-a.png')] bg-repeat pixel-art opacity-50 animate-twinkle pointer-events-none" />
-        <div className="absolute bottom-0 left-0 right-0 h-48 bg-[url('/assets/pixel/city-night.png')] bg-repeat-x bg-bottom pixel-art opacity-30 pointer-events-none" />
-
-        <div className="absolute bottom-0 left-8 z-0 hidden sm:block">
-          <PixelStreetLamp height={110} />
-        </div>
-        <div className="absolute bottom-0 right-8 z-0 hidden sm:block">
-          <PixelVendingMachine height={100} />
-        </div>
-
-        <div className="w-full max-w-sm bg-[#0C1230]/90 pixel-box p-8 text-center relative z-10 backdrop-blur" suppressHydrationWarning>
-          <div className="w-14 h-14 pixel-box-cyber bg-[#E02F75] text-white flex items-center justify-center mx-auto mb-4">
-            <Lock className="w-7 h-7 text-white" />
-          </div>
-
-          <h1 className="font-pixel-title text-sm font-bold text-[#FFD84D] mb-2 leading-relaxed">
-            KIOS BOOTH TERKUNCI
-          </h1>
-          <p className="text-xs text-white/70 mb-6 leading-relaxed">
-            Layar ini khusus untuk tablet di bilik foto. Masukkan PIN operator untuk mengaktifkan mode aplikasi booth.
-          </p>
-
-          <form onSubmit={handleUnlock} className="space-y-4" suppressHydrationWarning autoComplete="off">
-            <div className="relative" suppressHydrationWarning>
-              <input
-                type="password"
-                maxLength={6}
-                value={pinInput}
-                onChange={(e) => {
-                  setPinInput(e.target.value);
-                  setPinError(false);
-                }}
-                placeholder="PIN OPERATOR"
-                autoComplete="new-password"
-                data-1p-ignore="true"
-                data-lpignore="true"
-                suppressHydrationWarning
-                className="w-full h-12 text-center text-base tracking-widest font-pixel-title border-4 border-[#4B57B2] bg-[#010030] text-[#FFD84D] focus:outline-none focus:border-[#E02F75] transition-all"
-              />
-              <KeyRound className="w-4 h-4 text-white/40 absolute left-3 top-4 pointer-events-none" />
-            </div>
-
-            {pinError && (
-              <p className="text-xs text-[#FF5A57] font-bold">
-                [!] PIN SALAH
-              </p>
-            )}
-
-            <button
-              type="submit"
-              suppressHydrationWarning
-              className="w-full h-12 pixel-btn bg-[#E02F75] text-white text-xs font-bold hover:bg-[#FF5A57]"
-            >
-              BUKA APLIKASI BOOTH
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setIsUnlocked(true);
-                sessionStorage.setItem('booth_kiosk_unlocked', 'true');
-                if (soundEnabled) retroAudio.playSuccessChime();
-              }}
-              suppressHydrationWarning
-              className="w-full h-10 pixel-btn bg-[#00E599] text-[#050C38] text-xs font-bold hover:bg-[#5CE1E6] mt-2 active:scale-95"
-            >
-              🚀 BUKA KIOS LANGSUNG (PIN: 1234)
-            </button>
-          </form>
-
-          <div className="mt-6 pt-4 border-t border-white/10 text-[11px] text-white/40">
-            PIN Default Operator: <span className="text-[#FFD84D] font-mono font-bold">1234</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // =========================================================================
-  // 2. TAMPILAN APLIKASI BOOTH (STANDBY / SESI FOTO) - FLUTTER APK TABLET STYLE
+  // TAMPILAN APLIKASI BOOTH (STANDBY / SESI FOTO / LOCK) - FLUTTER APK TABLET STYLE
   // =========================================================================
   return (
-    <div className="relative w-full h-screen max-h-screen bg-[#050C38] text-white flex flex-col justify-between overflow-hidden select-none font-pixel touch-manipulation">
+    <div className="relative w-full h-[100dvh] max-h-[100dvh] bg-[#050C38] text-white flex flex-col overflow-hidden select-none font-pixel touch-manipulation">
       {/* 1. Latar Belakang Gradien Langit Malam Metropolitan */}
       <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#160078] via-[#050C38] to-[#010030] pointer-events-none" />
 
@@ -1165,28 +1080,32 @@ export default function BoothKioskPage() {
         <div className="fixed inset-0 bg-[#FFD84D] opacity-95 z-50 pointer-events-none transition-opacity duration-300" />
       )}
 
-      {/* Header Aplikasi Booth Kios */}
-      <header className="px-3 sm:px-6 py-2 flex items-center justify-between border-b-2 sm:border-b-4 border-[#4B57B2] z-30 bg-[#0C1230]/95 backdrop-blur shrink-0">
-        <div className="flex items-center gap-3">
-          <span className={`w-3 h-3 ${step === 'standby' ? 'bg-[#FFD84D]' : 'bg-[#00E599]'} animate-pulse shadow-[0_0_8px_currentColor]`} />
-          <span className="font-pixel-title text-xs text-[#A9B8FF] tracking-wider">
+      {/* Header Aplikasi Booth Kios - SELALU MUNCUL PERMANEN DI ATAS */}
+      <header className="sticky top-0 left-0 right-0 w-full shrink-0 z-40 bg-[#0C1230]/95 backdrop-blur border-b-2 sm:border-b-4 border-[#4B57B2] px-2 sm:px-4 py-1.5 flex items-center justify-between gap-2 overflow-x-auto scrollbar-none shadow-md">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <span className={`w-2.5 h-2.5 ${!isUnlocked ? 'bg-[#FE0168]' : step === 'standby' ? 'bg-[#FFD84D]' : 'bg-[#00E599]'} animate-pulse shadow-[0_0_8px_currentColor] shrink-0`} />
+          <span className="font-pixel-title text-[10px] sm:text-xs text-[#A9B8FF] tracking-wider whitespace-nowrap">
             EXPO WISUDA TIK 2026 &bull; PHOTOBOOTH APP
           </span>
         </div>
 
-        <div className="flex items-center gap-4 text-xs">
-          {ticketNumber ? (
-            <span className="bg-[#131947] px-3 py-1 border-2 border-[#4B57B2] text-[#FFD84D] font-pixel-title text-xs">
+        <div className="flex items-center gap-1.5 sm:gap-2 text-xs shrink-0">
+          {!isUnlocked ? (
+            <span className="bg-[#FE0168]/20 px-2 py-1 border border-[#FE0168] text-[#FE0168] font-pixel-title text-[10px] whitespace-nowrap">
+              KIOS TERKUNCI
+            </span>
+          ) : ticketNumber ? (
+            <span className="bg-[#131947] px-2 sm:px-3 py-1 border border-[#4B57B2] text-[#FFD84D] font-pixel-title text-[10px] sm:text-xs whitespace-nowrap">
               TIKET: {ticketNumber}
             </span>
           ) : (
-            <span className="bg-[#131947] px-3 py-1 border-2 border-[#4B57B2] text-[#5CE1E6] font-pixel-title text-xs">
+            <span className="bg-[#131947] px-2 sm:px-3 py-1 border border-[#4B57B2] text-[#5CE1E6] font-pixel-title text-[10px] sm:text-xs whitespace-nowrap">
               STANDBY
             </span>
           )}
 
           {/* Tombol Opsi Sumber Kamera (Canon DSLR vs Laptop Webcam) & Uji */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1 shrink-0">
             {/* Tombol Hubungkan / Status Canon Langsung di Navbar */}
             <button
               type="button"
@@ -1194,14 +1113,14 @@ export default function BoothKioskPage() {
                 handleOpenWebcamTest();
                 scanAndCheckCanon();
               }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 border-2 text-[11px] font-pixel-title transition-all active:scale-95 shadow-sm ${
+              className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 border-2 text-[10px] font-pixel-title transition-all active:scale-95 shadow-sm shrink-0 whitespace-nowrap ${
                 cameraSource === 'canon'
                   ? 'bg-[#00E599]/20 border-[#00E599] text-[#00E599] hover:bg-[#00E599]/30'
                   : 'bg-[#131947] hover:bg-[#160078] border-[#FFD84D] text-[#FFD84D] animate-pulse'
               }`}
               title="Hubungkan & Uji Kamera Canon EOS 1200D"
             >
-              <Camera className="w-4 h-4 text-[#00E599]" />
+              <Camera className="w-3.5 h-3.5 text-[#00E599]" />
               <span>
                 {cameraSource === 'canon'
                   ? 'CANON 1200D ● AKTIF'
@@ -1213,7 +1132,7 @@ export default function BoothKioskPage() {
             <button
               type="button"
               onClick={handleOpenWebcamTest}
-              className={`px-2.5 py-1.5 bg-[#131947] hover:bg-[#160078] border-2 text-[10px] font-pixel-title active:scale-95 flex items-center gap-1 ${
+              className={`px-2 py-1 bg-[#131947] hover:bg-[#160078] border text-[10px] font-pixel-title active:scale-95 flex items-center gap-1 shrink-0 whitespace-nowrap ${
                 cameraSource === 'webcam' ? 'border-[#5CE1E6] text-[#5CE1E6]' : 'border-white/20 text-white/60'
               }`}
               title="Buka Pengaturan Kamera & Live Feed"
@@ -1229,7 +1148,7 @@ export default function BoothKioskPage() {
             <button
               type="button"
               onClick={handleInstallApk}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 border-2 text-[10px] font-pixel-title transition-all active:scale-95 shadow-sm ${
+              className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 border text-[10px] font-pixel-title transition-all active:scale-95 shadow-sm shrink-0 whitespace-nowrap ${
                 isStandaloneApp
                   ? 'bg-[#00E599]/20 border-[#00E599] text-[#00E599]'
                   : 'bg-[#FE0168] hover:bg-[#E02F75] border-[#FFD84D] text-white animate-pulse'
@@ -1246,33 +1165,116 @@ export default function BoothKioskPage() {
               setSoundEnabled(!soundEnabled);
               if (!soundEnabled) retroAudio.playButtonClick();
             }}
-            className="p-2 border-2 border-[#4B57B2] hover:bg-white/10 text-[#FFD84D]"
+            className="p-1.5 border border-[#4B57B2] hover:bg-white/10 text-[#FFD84D] shrink-0"
             title="Toggle Suara 8-Bit"
           >
-            {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            {soundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
           </button>
+
           <button
             onClick={toggleFullscreen}
-            className="p-2 border-2 border-[#4B57B2] hover:bg-white/10 text-white"
+            className="p-1.5 border border-[#4B57B2] hover:bg-white/10 text-white shrink-0"
             title="Layar Penuh (App Mode)"
           >
-            <Maximize className="w-4 h-4" />
+            <Maximize className="w-3.5 h-3.5" />
           </button>
-          <button
-            onClick={handleLockAgain}
-            className="text-[10px] text-white/50 hover:text-white underline ml-2"
-          >
-            Kunci Kios
-          </button>
+
+          {isUnlocked ? (
+            <button
+              onClick={handleLockAgain}
+              className="text-[9px] text-white/50 hover:text-white underline shrink-0 whitespace-nowrap pl-1"
+            >
+              Kunci Kios
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                setIsUnlocked(true);
+                sessionStorage.setItem('booth_kiosk_unlocked', 'true');
+                if (soundEnabled) retroAudio.playSuccessChime();
+              }}
+              className="px-2 py-0.5 bg-[#00E599] text-[#050C38] text-[9px] font-pixel-title font-bold shrink-0 whitespace-nowrap"
+            >
+              Buka Kios
+            </button>
+          )}
         </div>
       </header>
 
-      {/* Konten Utama Interaktif Booth (Tepat 1 Layar Tanpa Scroll Vertikal) */}
+      {/* Konten Utama Interaktif Booth */}
       <main className="flex-1 min-h-0 w-full max-w-7xl mx-auto px-2 sm:px-4 py-1 sm:py-1.5 z-20 relative flex flex-col items-center justify-center overflow-hidden">
-        {/* ===================================================================
-            STEP 0: STANDBY (MOHON TUNGGU SEBENTAR / PILIH KAMERA)
-            =================================================================== */}
-        {step === 'standby' && (
+        {/* Layar Kios Terkunci (Jika isUnlocked false) */}
+        {!isUnlocked ? (
+          <div className="w-full max-w-sm bg-[#0C1230]/95 pixel-box p-6 sm:p-8 text-center relative z-10 backdrop-blur shadow-[0_0_30px_rgba(5,12,56,0.9)] my-auto" suppressHydrationWarning>
+            <div className="w-12 h-12 pixel-box-cyber bg-[#E02F75] text-white flex items-center justify-center mx-auto mb-3">
+              <Lock className="w-6 h-6 text-white" />
+            </div>
+
+            <h1 className="font-pixel-title text-sm font-bold text-[#FFD84D] mb-2 leading-relaxed">
+              KIOS BOOTH TERKUNCI
+            </h1>
+            <p className="text-[11px] text-white/70 mb-5 leading-relaxed font-sans">
+              Layar ini khusus untuk bilik photobooth. Masukkan PIN operator atau tekan tombol buka untuk memulai.
+            </p>
+
+            <form onSubmit={handleUnlock} className="space-y-3" suppressHydrationWarning autoComplete="off">
+              <div className="relative" suppressHydrationWarning>
+                <input
+                  type="password"
+                  maxLength={6}
+                  value={pinInput}
+                  onChange={(e) => {
+                    setPinInput(e.target.value);
+                    setPinError(false);
+                  }}
+                  placeholder="PIN OPERATOR"
+                  autoComplete="new-password"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
+                  suppressHydrationWarning
+                  className="w-full h-11 text-center text-sm tracking-widest font-pixel-title border-2 border-[#4B57B2] bg-[#010030] text-[#FFD84D] focus:outline-none focus:border-[#E02F75] transition-all"
+                />
+                <KeyRound className="w-4 h-4 text-white/40 absolute left-3 top-3.5 pointer-events-none" />
+              </div>
+
+              {pinError && (
+                <p className="text-xs text-[#FF5A57] font-bold">
+                  [!] PIN SALAH
+                </p>
+              )}
+
+              <button
+                type="submit"
+                suppressHydrationWarning
+                className="w-full h-11 pixel-btn bg-[#E02F75] hover:bg-[#FE0168] text-white text-xs font-pixel-title font-bold active:scale-95"
+              >
+                BUKA APLIKASI BOOTH
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsUnlocked(true);
+                  sessionStorage.setItem('booth_kiosk_unlocked', 'true');
+                  if (soundEnabled) retroAudio.playSuccessChime();
+                }}
+                suppressHydrationWarning
+                className="w-full h-10 pixel-btn bg-[#00E599] hover:bg-[#5CE1E6] text-[#050C38] text-xs font-pixel-title font-bold mt-1.5 active:scale-95 shadow"
+              >
+                🚀 BUKA KIOS LANGSUNG (PIN: 1234)
+              </button>
+            </form>
+
+            <div className="mt-4 pt-3 border-t border-white/10 text-[10px] text-white/50">
+              PIN Default Operator: <span className="text-[#FFD84D] font-mono font-bold">1234</span>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* ===================================================================
+                STEP 0: STANDBY (MOHON TUNGGU SEBENTAR / PILIH KAMERA)
+                =================================================================== */}
+            {step === 'standby' && (
           <div className="animate-fadeIn max-w-xl w-full bg-[#0C1230]/95 pixel-box p-6 sm:p-8 text-center backdrop-blur shadow-[0_0_24px_rgba(5,12,56,0.9)] my-auto">
             <div className="w-14 h-14 mx-auto pixel-box-cyber bg-[#160078] text-[#FFD84D] flex items-center justify-center mb-3">
               <Hourglass className="w-7 h-7 animate-spin" style={{ animationDuration: '6s' }} />
@@ -1698,6 +1700,8 @@ export default function BoothKioskPage() {
             canvasHeight={selectedTemplate.canvasHeight}
             onReset={handleFinishSession}
           />
+        )}
+          </>
         )}
       </main>
 
