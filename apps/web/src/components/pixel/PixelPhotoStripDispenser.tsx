@@ -116,45 +116,38 @@ export function PixelPhotoStripDispenser({
       : getDefaultSlots(photos.length || 4, canvasWidth, canvasHeight);
 
   return (
-    <div className="flex flex-col items-center justify-center w-full max-w-4xl mx-auto font-pixel select-none animate-fadeIn py-2">
-      {/* Petunjuk Gulir jika di layar vertikal kecil */}
-      <div className="lg:hidden flex items-center gap-1.5 text-[10px] font-pixel-title text-[#FFD84D] mb-3 animate-bounce">
-        <ArrowDown className="w-3.5 h-3.5" />
-        <span>GULIR KE BAWAH UNTUK UNDUH &amp; SELESAI</span>
-        <ArrowDown className="w-3.5 h-3.5" />
-      </div>
-
-      {/* Kontainer Fleksibel: Bersebelahan di Landscape / Layar Lebar, Menumpuk di Portrait */}
-      <div className="flex flex-col lg:flex-row items-center lg:items-start justify-center gap-8 w-full">
+    <div className="flex flex-col items-center justify-center w-full max-w-4xl mx-auto font-pixel select-none animate-fadeIn py-1 max-h-full">
+      {/* Kontainer Fleksibel Bersebelahan 1 Layar Pas Tanpa Perlu Scroll */}
+      <div className="flex flex-row items-center justify-center gap-4 sm:gap-8 w-full max-h-full">
         {/* Kolom Kiri: Mesin Dispenser & Kertas Strip 4R */}
-        <div className="flex flex-col items-center w-full max-w-xs">
+        <div className="flex flex-col items-center shrink-0 w-48 sm:w-56 md:w-60">
           {/* Rumah Slot Dispenser Arcade */}
-          <div className="w-full bg-[#1C2140] border-4 border-[#050C38] shadow-[0_6px_0_0_#050C38] p-2.5 text-center relative z-20">
+          <div className="w-full bg-[#1C2140] border-2 sm:border-4 border-[#050C38] shadow-[0_4px_0_0_#050C38] p-1.5 sm:p-2 text-center relative z-20">
             {/* Garis Hazard Kuning-Hitam */}
             <div
-              className="w-full h-2.5 mb-1.5 border border-black/40"
+              className="w-full h-2 mb-1 border border-black/40"
               style={{
                 backgroundImage:
                   'repeating-linear-gradient(45deg, #FFD84D, #FFD84D 8px, #050C38 8px, #050C38 16px)',
               }}
             />
 
-            <div className="flex items-center justify-between text-[9px] font-pixel-title text-[#FFD84D] px-1">
+            <div className="flex items-center justify-between text-[8px] sm:text-[9px] font-pixel-title text-[#FFD84D] px-1">
               <span>DISPENSER 4R</span>
               <span className="flex items-center gap-1 text-[#00E599]">
-                <span className="w-2 h-2 bg-[#00E599] animate-pulse" />
+                <span className="w-1.5 h-1.5 bg-[#00E599] animate-pulse" />
                 PRINT READY
               </span>
             </div>
 
             {/* Celah Pengeluaran Kertas Foto */}
-            <div className="w-full h-2.5 bg-black mt-1.5 border-t-2 border-b-2 border-[#4B57B2] relative overflow-hidden" />
+            <div className="w-full h-2 bg-black mt-1 border-t-2 border-b-2 border-[#4B57B2] relative overflow-hidden" />
           </div>
 
           {/* Kertas Foto Strip 4R yang Meluncur Keluar */}
           <div
-            className={`w-64 bg-gradient-to-b from-[#0C1230] to-[#160078] border-4 border-[#E02F75] p-2.5 shadow-[6px_6px_0_0_rgba(5,12,56,0.8)] transition-all duration-1000 ease-out -mt-1 relative z-10 overflow-hidden ${
-              dispensed ? 'translate-y-0 opacity-100' : '-translate-y-12 opacity-30'
+            className={`w-full bg-gradient-to-b from-[#0C1230] to-[#160078] border-2 sm:border-4 border-[#E02F75] p-1.5 sm:p-2 shadow-[4px_4px_0_0_rgba(5,12,56,0.8)] transition-all duration-1000 ease-out -mt-1 relative z-10 overflow-hidden ${
+              dispensed ? 'translate-y-0 opacity-100' : '-translate-y-8 opacity-30'
             }`}
           >
             {/* Lembar 4R Berbingkai Asli (Foto ditempatkan presisi di koordinat slot template) */}
@@ -217,7 +210,7 @@ export function PixelPhotoStripDispenser({
                 />
               )}
 
-              <span className="absolute bottom-1 right-1.5 z-20 text-[7px] font-pixel-title text-[#FFD84D] bg-black/70 px-1 border border-[#FFD84D]/30">
+              <span className="absolute bottom-1 right-1.5 z-20 text-[6px] sm:text-[7px] font-pixel-title text-[#FFD84D] bg-black/70 px-1 border border-[#FFD84D]/30 truncate max-w-[90%]">
                 {visitorName} ({ticketNumber})
               </span>
             </div>
@@ -225,17 +218,16 @@ export function PixelPhotoStripDispenser({
         </div>
 
         {/* Kolom Kanan: Tombol Unduh Langsung, QR Code & Tombol Selesai */}
-        <div className="w-full max-w-sm flex flex-col items-center">
-          <div className="w-full bg-[#0C1230]/95 pixel-box-cyber p-6 text-center backdrop-blur">
-            <div className="w-12 h-12 mx-auto pixel-box bg-[#049A5C] text-white flex items-center justify-center mb-3">
-              <Sparkles className="w-6 h-6 text-[#FFD84D]" />
+        <div className="w-full max-w-sm flex flex-col items-center justify-between">
+          <div className="w-full bg-[#0C1230]/95 pixel-box-cyber p-3 sm:p-4 text-center backdrop-blur">
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <Sparkles className="w-4 h-4 text-[#FFD84D]" />
+              <h2 className="font-pixel-title text-xs sm:text-sm text-[#FFD84D] leading-relaxed">
+                FOTO BERHASIL DISIMPAN!
+              </h2>
             </div>
-
-            <h2 className="font-pixel-title text-sm text-[#FFD84D] mb-1.5 leading-relaxed">
-              FOTO BERHASIL DISIMPAN!
-            </h2>
-            <p className="text-xs text-[#A9B8FF] mb-4">
-              Foto Anda telah siap dicetak dan disimpan. Anda dapat mengunduh berkasnya langsung ke perangkat ini atau memindai QR Code di bawah.
+            <p className="text-[10px] text-[#A9B8FF] mb-2.5">
+              Tiket <span className="text-[#FFD84D] font-bold">{ticketNumber}</span> &bull; {visitorName}
             </p>
 
             {/* TOMBOL UNDUH LANGSUNG STRIP 4R */}
@@ -243,7 +235,7 @@ export function PixelPhotoStripDispenser({
               type="button"
               onClick={handleDownloadStrip}
               disabled={isDownloading}
-              className={`w-full h-13 py-3 pixel-btn text-xs font-pixel-title font-bold tracking-wider flex items-center justify-center gap-2 shadow-[4px_4px_0_0_#050C38] active:scale-95 mb-4 transition-all ${
+              className={`w-full h-9 sm:h-10 py-1.5 pixel-btn text-[11px] font-pixel-title font-bold tracking-wider flex items-center justify-center gap-1.5 shadow-[2px_2px_0_0_#050C38] active:scale-95 mb-2.5 transition-all ${
                 downloadSuccess
                   ? 'bg-[#00E599] text-[#050C38]'
                   : 'bg-[#FFD84D] hover:bg-[#FFE57F] text-[#050C38]'
@@ -265,32 +257,32 @@ export function PixelPhotoStripDispenser({
             </button>
 
             {/* Kotak QR Code Pixel Asli Dinamis */}
-            <div className="w-52 mx-auto bg-white p-3 pixel-box flex flex-col items-center justify-center mb-3">
+            <div className="w-36 sm:w-44 mx-auto bg-white p-2 pixel-box flex flex-col items-center justify-center mb-2">
               {qrDataUrl ? (
                 <img
                   src={qrDataUrl}
                   alt={`QR Code Galeri Tiket ${ticketNumber}`}
-                  className="w-44 h-44 pixel-art object-contain"
+                  className="w-28 h-28 sm:w-36 sm:h-36 pixel-art object-contain"
                 />
               ) : (
-                <div className="w-44 h-44 flex flex-col items-center justify-center text-black/60 gap-2">
-                  <QrCode className="w-12 h-12 animate-pulse" />
-                  <span className="font-pixel-title text-[9px]">MEMBUAT QR CODE...</span>
+                <div className="w-28 h-28 sm:w-36 sm:h-36 flex flex-col items-center justify-center text-black/60 gap-1">
+                  <QrCode className="w-8 h-8 animate-pulse" />
+                  <span className="font-pixel-title text-[8px]">MEMBUAT QR CODE...</span>
                 </div>
               )}
-              <span className="text-[8px] font-pixel-title text-[#050C38] mt-1.5 text-center">
+              <span className="text-[7px] sm:text-[8px] font-pixel-title text-[#050C38] mt-1 text-center">
                 PINDAI UNTUK SIMPAN KE HP
               </span>
             </div>
 
             {/* Tautan Langsung & Salin URL Galeri */}
             {galleryFullUrl && (
-              <div className="flex items-center justify-center gap-2 mb-4">
+              <div className="flex items-center justify-center gap-1.5 mb-2.5">
                 <a
                   href={galleryFullUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-2.5 py-1 bg-[#131947] hover:bg-[#1E2768] text-[#5CE1E6] border border-[#5CE1E6]/40 font-pixel-title text-[9px] flex items-center gap-1 transition-colors"
+                  className="px-2 py-0.5 bg-[#131947] hover:bg-[#1E2768] text-[#5CE1E6] border border-[#5CE1E6]/40 font-pixel-title text-[8px] sm:text-[9px] flex items-center gap-1 transition-colors"
                   title="Buka galeri di tab baru"
                 >
                   <ExternalLink className="w-3 h-3" />
@@ -303,7 +295,7 @@ export function PixelPhotoStripDispenser({
                     setCopiedLink(true);
                     setTimeout(() => setCopiedLink(false), 2000);
                   }}
-                  className="px-2.5 py-1 bg-[#131947] hover:bg-[#1E2768] text-[#FFD84D] border border-[#FFD84D]/40 font-pixel-title text-[9px] flex items-center gap-1 transition-colors"
+                  className="px-2 py-0.5 bg-[#131947] hover:bg-[#1E2768] text-[#FFD84D] border border-[#FFD84D]/40 font-pixel-title text-[8px] sm:text-[9px] flex items-center gap-1 transition-colors"
                   title="Salin tautan galeri"
                 >
                   {copiedLink ? <Check className="w-3 h-3 text-[#00E599]" /> : <Copy className="w-3 h-3" />}
@@ -312,22 +304,18 @@ export function PixelPhotoStripDispenser({
               </div>
             )}
 
-            <p className="font-pixel-title text-[10px] text-[#5CE1E6] mb-5">
-              TIKET: <span className="text-[#FFD84D]">{ticketNumber}</span> &bull; {visitorName}
-            </p>
-
             {/* Tombol Selesai yang Jelas dan Mudah Ditekan */}
             <button
               onClick={onReset}
-              className="w-full h-12 pixel-btn bg-[#049A5C] hover:bg-[#00E599] text-white font-pixel-title text-xs tracking-wider flex items-center justify-center gap-2"
+              className="w-full h-10 pixel-btn bg-[#049A5C] hover:bg-[#00E599] text-white font-pixel-title text-[11px] tracking-wider flex items-center justify-center gap-2 shadow-[2px_2px_0_0_#050C38] active:scale-95"
             >
-              <Check className="w-5 h-5 text-white" />
+              <Check className="w-4 h-4 text-white" />
               <span>SELESAI &bull; KEMBALI KE STANDBY</span>
             </button>
           </div>
 
-          <div className="mt-4 p-3 bg-[#131947]/90 pixel-box text-center text-[10px] font-pixel-title text-[#FFD84D] flex items-center justify-center gap-2 w-full">
-            <PixelPrinterIcon size={16} />
+          <div className="mt-2 p-1.5 bg-[#131947]/90 pixel-box text-center text-[9px] font-pixel-title text-[#FFD84D] flex items-center justify-center gap-1.5 w-full">
+            <PixelPrinterIcon size={14} />
             <span>AMBIL CETAKAN 4R DI MEJA OPERATOR</span>
           </div>
         </div>
