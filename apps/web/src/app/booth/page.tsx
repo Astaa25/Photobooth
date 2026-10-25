@@ -186,30 +186,24 @@ export default function BoothKioskPage() {
     }
   };
 
-  // Buka modal uji kamera laptop dan pasangkan feed langsung
+  // Buka modal uji kamera dan pasangkan feed langsung jika mode webcam
   const handleOpenWebcamTest = async () => {
     setIsWebcamModalOpen(true);
-    setCameraSource('webcam');
-    try {
-      localStorage.setItem('photobooth_selected_camera', 'webcam');
-      const channel = new BroadcastChannel('photobooth_session_sync');
-      channel.postMessage({ type: 'CAMERA_CHANGED', cameraSource: 'webcam' });
-      channel.close();
-    } catch {}
-
-    try {
-      const res = await getSharedWebcamStream(selectedWebcamId || undefined);
-      setWebcamStatus('connected');
-      setWebcamErrorMsg(null);
-      if (testVideoRef.current) {
-        await bindStreamToVideo(testVideoRef.current, res.stream);
+    if (cameraSource === 'webcam') {
+      try {
+        const res = await getSharedWebcamStream(selectedWebcamId || undefined);
+        setWebcamStatus('connected');
+        setWebcamErrorMsg(null);
+        if (testVideoRef.current) {
+          await bindStreamToVideo(testVideoRef.current, res.stream);
+        }
+        const devs = await enumerateVideoDevices();
+        setWebcamDevices(devs);
+      } catch (err: any) {
+        console.warn('Status koneksi webcam saat uji coba:', err?.name || err?.message || err);
+        setWebcamStatus('error');
+        setWebcamErrorMsg(getHumanWebcamError(err));
       }
-      const devs = await enumerateVideoDevices();
-      setWebcamDevices(devs);
-    } catch (err: any) {
-      console.warn('Status koneksi webcam saat uji coba:', err?.name || err?.message || err);
-      setWebcamStatus('error');
-      setWebcamErrorMsg(getHumanWebcamError(err));
     }
   };
 
@@ -789,14 +783,11 @@ export default function BoothKioskPage() {
             </span>
           )}
 
-          {/* Tombol Opsi Sumber Kamera (Canon DSLR vs Laptop Webcam) */}
+          {/* Tombol Opsi Sumber Kamera (Canon DSLR vs Laptop Webcam) & Uji */}
           <div className="flex items-center gap-1.5">
             <button
               type="button"
-              onClick={() => {
-                if (soundEnabled) retroAudio.playButtonClick();
-                handleSwitchCamera(cameraSource === 'canon' ? 'webcam' : 'canon');
-              }}
+              onClick={handleOpenWebcamTest}
               className={`flex items-center gap-1.5 px-3 py-1.5 bg-[#131947] hover:bg-[#160078] border-2 text-[11px] font-pixel-title transition-all active:scale-95 ${
                 cameraSource === 'webcam' && webcamStatus === 'error'
                   ? 'border-[#FE0168] text-[#FE0168]'
@@ -804,13 +795,13 @@ export default function BoothKioskPage() {
                   ? 'border-[#00E599] text-[#00E599]'
                   : 'border-[#4B57B2] text-[#5CE1E6]'
               }`}
-              title="Ganti Sumber Kamera (Canon DSLR vs Laptop Webcam)"
+              title="Pengaturan Sumber Kamera (Canon DSLR / Laptop Webcam / Simulator)"
             >
               {cameraSource === 'webcam' ? (
                 <>
                   <Laptop className="w-3.5 h-3.5" />
                   <span>
-                    KAMERA: LAPTOP{' '}
+                    KAMERA: {selectedWebcamId === 'simulator-virtual-webcam' ? 'SIMULATOR' : 'LAPTOP'}{' '}
                     {webcamStatus === 'connected'
                       ? '● SIAP'
                       : webcamStatus === 'error'
@@ -826,16 +817,14 @@ export default function BoothKioskPage() {
               )}
             </button>
 
-            {cameraSource === 'webcam' && (
-              <button
-                type="button"
-                onClick={handleOpenWebcamTest}
-                className="px-2 py-1.5 bg-[#6700A3] hover:bg-[#FE0168] border-2 border-[#5CE1E6] text-white text-[10px] font-pixel-title active:scale-95"
-                title="Buka Jendela Uji Live Feed Webcam"
-              >
-                UJI
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={handleOpenWebcamTest}
+              className="px-2.5 py-1.5 bg-[#6700A3] hover:bg-[#FE0168] border-2 border-[#5CE1E6] text-white text-[10px] font-pixel-title active:scale-95 flex items-center gap-1"
+              title="Buka Pengaturan & Uji Feed Kamera"
+            >
+              <span>UJI</span>
+            </button>
           </div>
 
           <button
@@ -883,172 +872,9 @@ export default function BoothKioskPage() {
               <PixelCrossStar size={12} />
             </div>
 
-            <h2 className="font-pixel-title text-xs text-[#5CE1E6] mb-4">
+            <h2 className="font-pixel-title text-xs text-[#5CE1E6] mb-6">
               EXPO WISUDA POLITEKNIK JURUSAN TIK 2026
             </h2>
-
-            {/* KARTU PENGATURAN SUMBER KAMERA */}
-            <div className="bg-[#050C38] border-2 border-[#4B57B2] p-3.5 mb-4 text-left">
-              <div className="flex items-center justify-between mb-2 pb-1.5 border-b border-[#4B57B2]/40">
-                <span className="text-[10px] font-pixel-title text-[#FFD84D]">
-                  PILIH SUMBER KAMERA BOOTH:
-                </span>
-                <span className={`text-[9px] font-pixel-title ${cameraSource === 'webcam' ? 'text-[#5CE1E6]' : 'text-[#00E599]'}`}>
-                  {cameraSource === 'webcam' ? 'KAMERA LAPTOP' : 'CANON DSLR'}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2.5">
-                <button
-                  type="button"
-                  onClick={() => handleSwitchCamera('webcam')}
-                  className={`p-2.5 pixel-btn text-left flex items-center gap-2 text-xs font-pixel-title transition-all active:scale-95 ${
-                    cameraSource === 'webcam' && selectedWebcamId !== 'simulator-virtual-webcam'
-                      ? 'bg-[#5CE1E6] text-[#050C38] border-2 border-white font-bold shadow'
-                      : 'bg-[#131947] text-white/70 hover:bg-[#160078]'
-                  }`}
-                >
-                  <Laptop className="w-4 h-4 shrink-0" />
-                  <span className="truncate">KAMERA LAPTOP</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleSwitchCamera('canon')}
-                  className={`p-2.5 pixel-btn text-left flex items-center gap-2 text-xs font-pixel-title transition-all active:scale-95 ${
-                    cameraSource === 'canon'
-                      ? 'bg-[#00E599] text-[#050C38] border-2 border-white font-bold shadow'
-                      : 'bg-[#131947] text-white/70 hover:bg-[#160078]'
-                  }`}
-                >
-                  <Camera className="w-4 h-4 shrink-0" />
-                  <span className="truncate">CANON 1200D</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleSwitchToSimulator}
-                  className={`p-2.5 pixel-btn text-left flex items-center gap-2 text-xs font-pixel-title transition-all active:scale-95 ${
-                    cameraSource === 'webcam' && selectedWebcamId === 'simulator-virtual-webcam'
-                      ? 'bg-[#FFD84D] text-[#050C38] border-2 border-white font-bold shadow'
-                      : 'bg-[#131947] text-white/70 hover:bg-[#160078]'
-                  }`}
-                  title="Gunakan simulasi live feed virtual jika kamera fisik bermasalah"
-                >
-                  <Sparkles className="w-4 h-4 shrink-0 text-[#FE0168]" />
-                  <span className="truncate">SIMULATOR (30 FPS)</span>
-                </button>
-              </div>
-
-              {/* Selector Device Kamera jika ada lebih dari 1 kamera (Misal ada Iriun & USB WebCam) */}
-              {cameraSource === 'webcam' && webcamDevices.length > 1 && (
-                <div className="mb-2.5 bg-[#0C1230] p-2 border border-[#4B57B2]/60">
-                  <label className="block text-[9px] font-pixel-title text-[#FFD84D] mb-1">
-                    PILIH PERANGKAT KAMERA (GANTI JIKA KAMERA IRIUN/UTAMA NONAKTIF):
-                  </label>
-                  <select
-                    value={selectedWebcamId}
-                    onChange={(e) => {
-                      const newDevId = e.target.value;
-                      setSelectedWebcamId(newDevId);
-                      if (newDevId === 'simulator-virtual-webcam') {
-                        handleSwitchToSimulator();
-                      } else {
-                        getSharedWebcamStream(newDevId, true)
-                          .then(() => {
-                            setWebcamStatus('connected');
-                            setWebcamErrorMsg(null);
-                          })
-                          .catch((err) => {
-                            setWebcamStatus('error');
-                            setWebcamErrorMsg(getHumanWebcamError(err));
-                          });
-                      }
-                    }}
-                    className="w-full bg-[#131947] border border-[#5CE1E6] text-xs text-white p-1.5 outline-none font-pixel"
-                  >
-                    {webcamDevices.map((d) => (
-                      <option key={d.deviceId} value={d.deviceId}>
-                        {d.label}
-                      </option>
-                    ))}
-                    <option value="simulator-virtual-webcam">🎭 Simulator Live 30 FPS</option>
-                  </select>
-                </div>
-              )}
-
-              {/* Status & Tombol Uji Feed Kamera Laptop */}
-              {cameraSource === 'webcam' && (
-                <div className="flex items-center justify-between bg-[#0C1230] p-2 border border-[#4B57B2]/60 text-[10px] font-pixel-title">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`w-2 h-2 ${
-                        webcamStatus === 'connected'
-                          ? 'bg-[#00E599]'
-                          : webcamStatus === 'error'
-                          ? 'bg-[#FE0168]'
-                          : 'bg-[#FFD84D]'
-                      } rounded-none animate-ping`}
-                    />
-                    <span
-                      className={
-                        webcamStatus === 'connected'
-                          ? 'text-[#00E599]'
-                          : webcamStatus === 'error'
-                          ? 'text-[#FE0168]'
-                          : 'text-[#FFD84D]'
-                      }
-                    >
-                      {webcamStatus === 'connected'
-                        ? selectedWebcamId === 'simulator-virtual-webcam'
-                          ? 'SIMULATOR 30 FPS SIAP'
-                          : 'KAMERA SIAP DIGUNAKAN'
-                        : webcamStatus === 'error'
-                        ? 'KENDALA AKSES IZIN'
-                        : 'MENGHUBUNGKAN...'}
-                    </span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleOpenWebcamTest}
-                    className="px-2.5 py-1 pixel-btn bg-[#6700A3] hover:bg-[#FE0168] text-white text-[9px] flex items-center gap-1 font-bold active:scale-95"
-                  >
-                    <Laptop className="w-3 h-3" />
-                    <span>UJI LIVE FEED</span>
-                  </button>
-                </div>
-              )}
-
-              {/* Pesan Error & Solusi jika Ada */}
-              {cameraSource === 'webcam' && webcamStatus === 'error' && (
-                <div className="mt-2 p-3 bg-[#FE0168]/20 border border-[#FE0168] text-[10px] text-white leading-relaxed font-sans space-y-2">
-                  <div className="text-[#FFD84D] font-bold flex items-center gap-1.5 font-pixel-title text-[9px]">
-                    <AlertTriangle className="w-3.5 h-3.5 text-[#FE0168] shrink-0" />
-                    <span>KAMERA LAPTOP BELUM DAPAT DIBUKA</span>
-                  </div>
-                  <p className="text-[10px] text-white/80">
-                    Jika Anda sudah klik <em>"Izinkan"</em> di Chrome, peramban mengharuskan Anda <strong>memuat ulang halaman (F5)</strong> untuk menerapkan izin tersebut. Periksa juga apakah software seperti <em>Iriun Webcam</em> yang nonaktif terpilih secara otomatis.
-                  </p>
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => window.location.reload()}
-                      className="px-3 py-1.5 pixel-btn bg-[#00E599] hover:bg-[#5CE1E6] text-[#050C38] text-[9px] font-pixel-title font-bold active:scale-95"
-                    >
-                      🔄 MUAT ULANG HALAMAN (F5)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSwitchToSimulator}
-                      className="px-3 py-1.5 pixel-btn bg-[#FFD84D] hover:bg-[#FFE57F] text-[#050C38] text-[9px] font-pixel-title font-bold active:scale-95 shadow"
-                    >
-                      🎭 PAKAI SIMULATOR (30 FPS)
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
 
             {/* Tombol Mulai Sesi Mandiri / Uji Coba */}
             <div className="space-y-2">
@@ -1300,15 +1126,15 @@ export default function BoothKioskPage() {
         <span className="text-[#FFD84D]">CANON 1200D &bull; EPSON L300 4R READY</span>
       </footer>
 
-      {/* Modal Uji Kamera Laptop */}
+      {/* Modal Uji & Pengaturan Kamera */}
       {isWebcamModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm font-pixel">
-          <div className="relative w-full max-w-lg bg-[#0C1230] border-4 border-[#5CE1E6] p-5 shadow-[8px_8px_0_0_#050C38] text-white">
+          <div className="relative w-full max-w-lg bg-[#0C1230] border-4 border-[#5CE1E6] p-5 shadow-[8px_8px_0_0_#050C38] text-white max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 mb-3 border-b-2 border-[#4B57B2]">
               <div className="flex items-center gap-2">
                 <Laptop className="w-5 h-5 text-[#5CE1E6]" />
                 <h3 className="font-pixel-title text-xs sm:text-sm text-[#FFD84D]">
-                  UJI LIVE FEED KAMERA LAPTOP
+                  PENGATURAN & UJI KAMERA BOOTH
                 </h3>
               </div>
               <button
@@ -1320,125 +1146,223 @@ export default function BoothKioskPage() {
               </button>
             </div>
 
-            {/* Video Preview */}
-            <div className="relative aspect-[4/3] w-full bg-black border-2 border-[#4B57B2] overflow-hidden mb-3">
-              <video
-                ref={testVideoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full h-full object-cover scale-x-[-1]"
-              />
-
-              {webcamStatus === 'connected' && (
-                <div className="absolute top-2 left-2 bg-black/75 px-2 py-0.5 border border-[#00E599] text-[#00E599] text-[9px] font-pixel-title flex items-center gap-1 z-10">
-                  <span className="w-1.5 h-1.5 bg-[#00E599] animate-pulse" />
-                  <span>LIVE KAMERA AKTIF</span>
-                </div>
-              )}
-
-              {/* Overlay Error Izin Ditolak Browser */}
-              {webcamStatus === 'error' && (
-                <div className="absolute inset-0 bg-black/95 p-4 flex flex-col items-center justify-center text-center z-20">
-                  <div className="w-10 h-10 bg-[#FE0168]/20 border border-[#FE0168] text-[#FE0168] flex items-center justify-center mb-2">
-                    <AlertTriangle className="w-5 h-5 animate-bounce" />
-                  </div>
-                  <h4 className="text-xs font-pixel-title text-[#FFD84D] mb-1">
-                    IZIN KAMERA DIBLOKIR BROWSER
-                  </h4>
-                  <div className="text-[10px] text-white/80 max-w-sm mb-3 leading-relaxed font-sans bg-[#131947]/90 p-2.5 border border-[#4B57B2] text-left">
-                    <p className="font-bold text-[#5CE1E6] mb-1">Cara Membuka Izin di Chrome / Edge:</p>
-                    <ol className="list-decimal list-inside space-y-1 text-white/70">
-                      <li>Klik ikon 🔒 (Gembok / Setelan Situs) di bilah URL <code className="text-[#FFD84D]">localhost:3000</code></li>
-                      <li>Ubah opsi <strong>Kamera</strong> menjadi <strong>Izinkan (Allow)</strong></li>
-                      <li>Klik tombol <em>Coba Hubungkan Lagi</em></li>
-                    </ol>
-                  </div>
-                  <div className="flex flex-wrap items-center justify-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => window.location.reload()}
-                      className="px-3 py-1.5 pixel-btn bg-[#FFD84D] hover:bg-[#FFE57F] text-[#050C38] text-[10px] font-pixel-title font-bold flex items-center gap-1 active:scale-95 shadow"
-                      title="Terapkan perubahan izin Chrome dengan memuat ulang halaman"
-                    >
-                      🔄 MUAT ULANG (F5)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleOpenWebcamTest}
-                      className="px-3 py-1.5 pixel-btn bg-[#00E599] hover:bg-[#5CE1E6] text-[#050C38] text-[10px] font-pixel-title font-bold flex items-center gap-1 active:scale-95"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" />
-                      <span>COBA HUBUNGKAN LAGI</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleUseSimulatorInModal}
-                      className="px-3 py-1.5 pixel-btn bg-[#E02F75] hover:bg-[#FE0168] text-white text-[10px] font-pixel-title font-bold flex items-center gap-1 shadow active:scale-95"
-                      title="Gunakan simulasi live feed 30 FPS untuk pengujian booth"
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-[#FFD84D]" />
-                      <span>🎭 GUNAKAN SIMULATOR KAMERA</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {testSnapshotUrl && (
-                <div className="absolute bottom-2 right-2 w-24 aspect-[4/3] border-2 border-[#FFD84D] shadow-lg overflow-hidden bg-black z-10">
-                  <img src={testSnapshotUrl} alt="Hasil Snapshot" className="w-full h-full object-cover" />
-                </div>
-              )}
-            </div>
-
-            {/* Selector Device jika ada lebih dari 1 kamera */}
-            {webcamDevices.length > 1 && (
-              <div className="mb-3">
-                <label className="block text-[10px] font-pixel-title text-[#A9B8FF] mb-1">
-                  PILIH PERANGKAT KAMERA:
-                </label>
-                <select
-                  value={selectedWebcamId}
-                  onChange={(e) => {
-                    setSelectedWebcamId(e.target.value);
-                    getSharedWebcamStream(e.target.value, true)
+            {/* Pilihan Sumber Kamera (Kamera Laptop / Canon 1200D / Simulator 30 FPS) */}
+            <div className="mb-3">
+              <label className="block text-[10px] font-pixel-title text-[#FFD84D] mb-1.5">
+                PILIH SUMBER KAMERA:
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleSwitchCamera('webcam');
+                    getSharedWebcamStream(selectedWebcamId !== 'simulator-virtual-webcam' ? selectedWebcamId : undefined, true)
                       .then((res) => {
+                        setWebcamStatus('connected');
+                        setWebcamErrorMsg(null);
                         if (testVideoRef.current) bindStreamToVideo(testVideoRef.current, res.stream);
+                        enumerateVideoDevices().then(setWebcamDevices);
                       })
                       .catch((err) => {
-                        console.warn('Gagal beralih device kamera:', err);
+                        setWebcamStatus('error');
+                        setWebcamErrorMsg(getHumanWebcamError(err));
                       });
                   }}
-                  className="w-full bg-[#050C38] border-2 border-[#4B57B2] text-xs text-white p-2 outline-none font-pixel"
+                  className={`p-2 pixel-btn text-center flex flex-col items-center justify-center gap-1 text-[10px] font-pixel-title transition-all active:scale-95 ${
+                    cameraSource === 'webcam' && selectedWebcamId !== 'simulator-virtual-webcam'
+                      ? 'bg-[#5CE1E6] text-[#050C38] border-2 border-white font-bold shadow'
+                      : 'bg-[#131947] text-white/70 hover:bg-[#160078]'
+                  }`}
                 >
-                  {webcamDevices.map((d) => (
-                    <option key={d.deviceId} value={d.deviceId}>
-                      {d.label}
-                    </option>
-                  ))}
-                </select>
+                  <Laptop className="w-4 h-4 shrink-0" />
+                  <span className="truncate">KAMERA LAPTOP</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleSwitchCamera('canon')}
+                  className={`p-2 pixel-btn text-center flex flex-col items-center justify-center gap-1 text-[10px] font-pixel-title transition-all active:scale-95 ${
+                    cameraSource === 'canon'
+                      ? 'bg-[#00E599] text-[#050C38] border-2 border-white font-bold shadow'
+                      : 'bg-[#131947] text-white/70 hover:bg-[#160078]'
+                  }`}
+                >
+                  <Camera className="w-4 h-4 shrink-0" />
+                  <span className="truncate">CANON 1200D</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleSwitchToSimulator();
+                    if (testVideoRef.current) {
+                      const sim = useSimulatorStream();
+                      bindStreamToVideo(testVideoRef.current, sim.stream);
+                    }
+                  }}
+                  className={`p-2 pixel-btn text-center flex flex-col items-center justify-center gap-1 text-[10px] font-pixel-title transition-all active:scale-95 ${
+                    cameraSource === 'webcam' && selectedWebcamId === 'simulator-virtual-webcam'
+                      ? 'bg-[#FFD84D] text-[#050C38] border-2 border-white font-bold shadow'
+                      : 'bg-[#131947] text-white/70 hover:bg-[#160078]'
+                  }`}
+                  title="Gunakan simulasi live feed virtual jika kamera fisik bermasalah"
+                >
+                  <Sparkles className="w-4 h-4 shrink-0 text-[#FE0168]" />
+                  <span className="truncate">SIMULATOR 30FPS</span>
+                </button>
+              </div>
+            </div>
+
+            {/* KONTEN JIKA MODE WEBCAM / SIMULATOR AKTIF */}
+            {cameraSource === 'webcam' ? (
+              <>
+                {/* Selector Device jika ada lebih dari 1 kamera */}
+                {webcamDevices.length > 1 && (
+                  <div className="mb-3 bg-[#050C38] p-2 border border-[#4B57B2]/60">
+                    <label className="block text-[9px] font-pixel-title text-[#A9B8FF] mb-1">
+                      PILIH PERANGKAT WEBCAM:
+                    </label>
+                    <select
+                      value={selectedWebcamId}
+                      onChange={(e) => {
+                        const newDevId = e.target.value;
+                        setSelectedWebcamId(newDevId);
+                        if (newDevId === 'simulator-virtual-webcam') {
+                          handleSwitchToSimulator();
+                          if (testVideoRef.current) {
+                            const sim = useSimulatorStream();
+                            bindStreamToVideo(testVideoRef.current, sim.stream);
+                          }
+                        } else {
+                          getSharedWebcamStream(newDevId, true)
+                            .then((res) => {
+                              setWebcamStatus('connected');
+                              setWebcamErrorMsg(null);
+                              if (testVideoRef.current) bindStreamToVideo(testVideoRef.current, res.stream);
+                            })
+                            .catch((err) => {
+                              setWebcamStatus('error');
+                              setWebcamErrorMsg(getHumanWebcamError(err));
+                            });
+                        }
+                      }}
+                      className="w-full bg-[#131947] border border-[#5CE1E6] text-xs text-white p-1.5 outline-none font-pixel"
+                    >
+                      {webcamDevices.map((d) => (
+                        <option key={d.deviceId} value={d.deviceId}>
+                          {d.label}
+                        </option>
+                      ))}
+                      <option value="simulator-virtual-webcam">🎭 Simulator Live 30 FPS</option>
+                    </select>
+                  </div>
+                )}
+
+                {/* Video Preview */}
+                <div className="relative aspect-[4/3] w-full bg-black border-2 border-[#4B57B2] overflow-hidden mb-3">
+                  <video
+                    ref={testVideoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover scale-x-[-1]"
+                  />
+
+                  {webcamStatus === 'connected' && (
+                    <div className="absolute top-2 left-2 bg-black/75 px-2 py-0.5 border border-[#00E599] text-[#00E599] text-[9px] font-pixel-title flex items-center gap-1 z-10">
+                      <span className="w-1.5 h-1.5 bg-[#00E599] animate-pulse" />
+                      <span>{selectedWebcamId === 'simulator-virtual-webcam' ? 'SIMULATOR 30 FPS AKTIF' : 'LIVE KAMERA AKTIF'}</span>
+                    </div>
+                  )}
+
+                  {/* Overlay Error Izin Ditolak Browser */}
+                  {webcamStatus === 'error' && (
+                    <div className="absolute inset-0 bg-black/95 p-4 flex flex-col items-center justify-center text-center z-20">
+                      <div className="w-10 h-10 bg-[#FE0168]/20 border border-[#FE0168] text-[#FE0168] flex items-center justify-center mb-2">
+                        <AlertTriangle className="w-5 h-5 animate-bounce" />
+                      </div>
+                      <h4 className="text-xs font-pixel-title text-[#FFD84D] mb-1">
+                        IZIN KAMERA DIBLOKIR BROWSER
+                      </h4>
+                      <p className="text-[10px] text-white/80 max-w-sm mb-3 leading-relaxed font-sans bg-[#131947]/90 p-2 border border-[#4B57B2] text-center">
+                        {webcamErrorMsg || 'Browser belum mengizinkan akses ke webcam laptop.'}
+                      </p>
+                      <div className="flex flex-wrap items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => window.location.reload()}
+                          className="px-3 py-1.5 pixel-btn bg-[#FFD84D] hover:bg-[#FFE57F] text-[#050C38] text-[10px] font-pixel-title font-bold flex items-center gap-1 active:scale-95 shadow"
+                        >
+                          🔄 MUAT ULANG (F5)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleOpenWebcamTest}
+                          className="px-3 py-1.5 pixel-btn bg-[#00E599] hover:bg-[#5CE1E6] text-[#050C38] text-[10px] font-pixel-title font-bold flex items-center gap-1 active:scale-95"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          <span>COBA HUBUNGKAN LAGI</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleUseSimulatorInModal}
+                          className="px-3 py-1.5 pixel-btn bg-[#E02F75] hover:bg-[#FE0168] text-white text-[10px] font-pixel-title font-bold flex items-center gap-1 shadow active:scale-95"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-[#FFD84D]" />
+                          <span>🎭 GUNAKAN SIMULATOR</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {testSnapshotUrl && (
+                    <div className="absolute bottom-2 right-2 w-24 aspect-[4/3] border-2 border-[#FFD84D] shadow-lg overflow-hidden bg-black z-10">
+                      <img src={testSnapshotUrl} alt="Hasil Snapshot" className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCaptureTestSnapshot}
+                    className="flex-1 py-2.5 pixel-btn bg-[#00E599] hover:bg-[#5CE1E6] text-[#050C38] text-xs font-pixel-title font-bold flex items-center justify-center gap-1.5 active:scale-95"
+                  >
+                    <Camera className="w-4 h-4" />
+                    <span>JEPRET FOTO CONTOH</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsWebcamModalOpen(false)}
+                    className="px-4 py-2.5 pixel-btn bg-[#131947] hover:bg-[#160078] text-[#FFD84D] text-xs font-pixel-title border border-[#4B57B2] active:scale-95"
+                  >
+                    GUNAKAN INI
+                  </button>
+                </div>
+              </>
+            ) : (
+              /* KONTEN JIKA MODE CANON 1200D AKTIF */
+              <div className="bg-[#050C38] border-2 border-[#00E599] p-5 text-center mb-3">
+                <div className="w-12 h-12 bg-[#00E599]/20 border border-[#00E599] text-[#00E599] flex items-center justify-center mx-auto mb-3">
+                  <Camera className="w-6 h-6" />
+                </div>
+                <h4 className="font-pixel-title text-xs text-[#00E599] mb-1">
+                  KAMERA CANON EOS 1200D AKTIF
+                </h4>
+                <p className="text-[11px] text-white/80 max-w-sm mx-auto mb-4 font-sans leading-relaxed">
+                  Bilik foto terhubung langsung ke kamera Canon DSLR via driver backend server. Foto akan diambil menggunakan sensor Canon saat sesi berlangsung.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIsWebcamModalOpen(false)}
+                  className="w-full py-2.5 pixel-btn bg-[#00E599] hover:bg-[#5CE1E6] text-[#050C38] text-xs font-pixel-title font-bold active:scale-95"
+                >
+                  SELESAI & GUNAKAN CANON
+                </button>
               </div>
             )}
-
-            {/* Action Buttons */}
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleCaptureTestSnapshot}
-                className="flex-1 py-2.5 pixel-btn bg-[#00E599] hover:bg-[#5CE1E6] text-[#050C38] text-xs font-pixel-title font-bold flex items-center justify-center gap-1.5 active:scale-95"
-              >
-                <Camera className="w-4 h-4" />
-                <span>JEPRET FOTO CONTOH</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsWebcamModalOpen(false)}
-                className="px-4 py-2.5 pixel-btn bg-[#131947] hover:bg-[#160078] text-[#FFD84D] text-xs font-pixel-title border border-[#4B57B2] active:scale-95"
-              >
-                GUNAKAN INI
-              </button>
-            </div>
           </div>
         </div>
       )}
