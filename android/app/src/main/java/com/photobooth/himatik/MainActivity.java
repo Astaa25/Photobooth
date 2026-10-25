@@ -1,4 +1,4 @@
-package com.photobooth.kiosk;
+package com.photobooth.himatik;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
@@ -37,7 +37,7 @@ import androidx.core.content.ContextCompat;
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final String PREFS_NAME = "PhotoboothPrefs";
+    private static final String PREFS_NAME = "PhotoboothHimatikPrefs";
     private static final String KEY_SERVER_URL = "server_url";
     private static final String DEFAULT_URL = "http://192.168.1.100:3000/booth";
     private static final int PERMISSION_REQ_CODE = 1001;
@@ -90,7 +90,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Long press di gear settings untuk refresh paksa
         btnOpenSettings.setOnLongClickListener(v -> {
-            Toast.makeText(this, "Memuat ulang halaman bilik...", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Memuat ulang bilik Photobooth HIMATIK...", Toast.LENGTH_SHORT).show();
             webView.reload();
             return true;
         });
@@ -113,8 +113,8 @@ public class MainActivity extends AppCompatActivity {
             settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         }
 
-        // Custom User-Agent agar server mengenali sebagai aplikasi tablet kiosk Android
-        String customUA = settings.getUserAgentString() + " PhotoboothKiosk/1.0 (Android Tablet; RedmiPad)";
+        // Custom User-Agent agar server mengenali sebagai aplikasi tablet Android Photobooth HIMATIK
+        String customUA = settings.getUserAgentString() + " PhotoboothHIMATIK/1.0 (Android Tablet; RedmiPad)";
         settings.setUserAgentString(customUA);
 
         webView.setWebChromeClient(new WebChromeClient() {
@@ -247,7 +247,6 @@ public class MainActivity extends AppCompatActivity {
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == PERMISSION_REQ_CODE) {
-            // Permission ditangani
             webView.reload();
         }
     }
@@ -275,11 +274,10 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public void onBackPressed() {
-        // Pada mode Kiosk Photobooth, tombol kembali dinonaktifkan agar pengunjung tidak sengaja keluar
         if (webView.canGoBack()) {
             webView.goBack();
         } else {
-            Toast.makeText(this, "Mode Kiosk Aktif. Gunakan tombol di layar.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Photobooth HIMATIK Aktif. Gunakan tombol di layar.", Toast.LENGTH_SHORT).show();
         }
     }
 }

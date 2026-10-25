@@ -35,41 +35,43 @@ jobs:
           chmod +x ./gradlew
           ./gradlew assembleRelease --no-daemon --stacktrace
 
-      - name: Verify APK Generated
+      - name: Verify APK Generated and Signed
         run: |
           ls -lah android/app/build/outputs/apk/release/
-          cp android/app/build/outputs/apk/release/photobooth-tablet-kiosk-release.apk ./photobooth-tablet-kiosk.apk
+          cp android/app/build/outputs/apk/release/photobooth-himatik.apk ./photobooth-himatik.apk
+          # Verifikasi sertifikat tanda tangan resmi (v1 + v2 Signature Scheme)
+          jarsigner -verify ./photobooth-himatik.apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: photobooth-tablet-kiosk-apk
-          path: ./photobooth-tablet-kiosk.apk
+          name: photobooth-himatik-apk
+          path: ./photobooth-himatik.apk
 
       - name: Publish to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.0
-          name: "Photobooth Tablet Kiosk APK v1.0.0"
+          tag_name: v1.0.1
+          name: "Photobooth HIMATIK APK"
           draft: false
           prerelease: false
           body: |
-            ## 📱 Photobooth Tablet Kiosk - Release APK Android
+            ## 📱 Photobooth HIMATIK - Release APK Android Resmi
             
-            File APK ini dibuat khusus untuk tablet Android (seperti **Redmi Pad 2**) agar dapat berjalan secara mandiri sebagai aplikasi Kiosk layar penuh tanpa browser Chrome.
+            File APK resmi ini dibuat khusus untuk tablet Android (termasuk **Redmi Pad 2 / Xiaomi HyperOS / MIUI**) yang telah ditandatangani dengan sertifikat resmi (v1 + v2 Signature Scheme) sehingga dapat langsung dipasang tanpa kendala "paket tidak valid".
 
             ### 🚀 Cara Pasang di Tablet (Redmi Pad 2):
-            1. Unduh file **`photobooth-tablet-kiosk.apk`** di bawah ini langsung dari tablet Anda.
-            2. Buka file APK yang sudah diunduh, lalu pilih **Pasang / Install** (izinkan "Instal aplikasi dari sumber tidak dikenal" jika diminta oleh MIUI/HyperOS).
-            3. Buka aplikasi **Photobooth Kiosk**.
-            4. Masukkan alamat IP laptop Anda (contoh: `http://192.168.1.5:3000/booth`).
-            5. Aplikasi akan langsung membuka layar bilik foto dalam mode Fullscreen Kiosk!
+            1. Unduh file **`photobooth-himatik.apk`** di bawah ini langsung dari tablet Anda.
+            2. Buka file APK yang sudah diunduh &rarr; klik **Pasang / Install**.
+            3. Buka aplikasi **Photobooth HIMATIK** di layar utama tablet.
+            4. Masukkan alamat IP laptop operator Anda (contoh: `http://192.168.1.5:3000/booth`).
+            5. Aplikasi akan langsung membuka bilik foto dalam mode Layar Penuh (Fullscreen Kiosk) tanpa Google Chrome!
 
-            ### ✨ Keunggulan APK Kiosk:
-            - **Fullscreen 100%**: Tanpa address bar, tab bar, ataupun tombol navigasi Chrome yang mengganggu pengunjung.
-            - **Layar Selalu Menyala (No Sleep)**: Tablet tidak akan mati atau terkunci di tengah antrean pengunjung.
-            - **Izin Kamera Otomatis**: Kamera langsung aktif tanpa pop-up izin yang merepotkan.
-            - **Pengaturan IP Cepat**: Bisa ganti IP laptop kapan saja melalui tombol gear di pojok layar.
-          files: ./photobooth-tablet-kiosk.apk
+            ### ✨ Keunggulan:
+            - **Nama Aplikasi Resmi:** Photobooth HIMATIK
+            - **Fullscreen 100%**: Tanpa address bar ataupun tab browser Chrome.
+            - **Layar Selalu Menyala (Anti-Sleep)**: Layar tablet tidak akan mati di tengah antrean pengunjung.
+            - **Izin Kamera Otomatis**: Kamera live view langsung aktif tanpa pop-up yang mengganggu.
+          files: ./photobooth-himatik.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

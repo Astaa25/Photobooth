@@ -1,5 +1,13 @@
 [
   {
+    "id": "reg-1792855418082",
+    "number": "#045",
+    "nickname": "Abrar",
+    "status": "QUEUED",
+    "registeredAt": "22.17",
+    "printCopies": 1
+  },
+  {
     "id": "1",
     "number": "#001",
     "nickname": "Diana",

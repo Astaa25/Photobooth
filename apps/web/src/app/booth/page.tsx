@@ -196,7 +196,7 @@ export default function BoothKioskPage() {
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const [apkQrDataUrl, setApkQrDataUrl] = useState<string | null>(null);
   const GITHUB_RELEASES_URL = 'https://github.com/Astaa25/Photobooth/releases';
-  const APK_DOWNLOAD_URL = 'https://github.com/Astaa25/Photobooth/releases/download/v1.0.0/photobooth-tablet-kiosk.apk';
+  const APK_DOWNLOAD_URL = 'https://github.com/Astaa25/Photobooth/releases/download/v1.0.1/photobooth-himatik.apk';
   const testVideoRef = useRef<HTMLVideoElement | null>(null);
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const [dynamicCardWidth, setDynamicCardWidth] = useState<number>(360);
@@ -2186,10 +2186,10 @@ export default function BoothKioskPage() {
               </div>
               <div>
                 <h3 className="font-pixel-title text-xs sm:text-sm text-[#FFD84D]">
-                  UNDUH RELEASE .APK ANDROID (GITHUB)
+                  UNDUH APK PHOTOBOOTH HIMATIK (ANDROID)
                 </h3>
                 <p className="text-[10px] sm:text-[11px] text-[#5CE1E6] font-sans">
-                  Aplikasi Mandiri Tablet Redmi Pad 2 &bull; Layar Penuh Tanpa Google Chrome
+                  Aplikasi Tablet Redmi Pad 2 &bull; Layar Penuh Tanpa Google Chrome
                 </p>
               </div>
             </div>
@@ -2216,7 +2216,7 @@ export default function BoothKioskPage() {
                 {/* Tombol Aksi Unduh */}
                 <div className="flex-1 w-full space-y-2 text-center sm:text-left">
                   <div className="text-[11px] text-white/80 leading-relaxed">
-                    Unduh file paket instalasi <span className="text-[#00E599] font-mono font-bold">photobooth-tablet-kiosk.apk</span> resmi dari GitHub Releases:
+                    Unduh paket aplikasi <span className="text-[#00E599] font-mono font-bold">photobooth-himatik.apk</span> (Sertifikat Resmi Terverifikasi) dari GitHub Releases:
                   </div>
 
                   <a
@@ -2255,7 +2255,7 @@ export default function BoothKioskPage() {
                   <div>
                     <p className="font-bold text-[#FFD84D] font-pixel text-[10px]">UNDUH FILE .APK DARI GITHUB</p>
                     <p className="text-white/80 text-[10.5px]">
-                      Buka rilis GitHub melalui tombol di atas atau scan QR di tablet Redmi Pad 2, lalu unduh file <strong>photobooth-tablet-kiosk.apk</strong>.
+                      Buka rilis GitHub melalui tombol di atas atau scan QR di tablet Redmi Pad 2, lalu unduh file <strong>photobooth-himatik.apk</strong>.
                     </p>
                   </div>
                 </div>
@@ -2265,7 +2265,7 @@ export default function BoothKioskPage() {
                   <div>
                     <p className="font-bold text-[#5CE1E6] font-pixel text-[10px]">PASANG (INSTALL) DI TABLET</p>
                     <p className="text-white/80 text-[10.5px]">
-                      Buka file APK yang telah diunduh di Redmi Pad 2 &gt; pilih <strong>Pasang / Install</strong>. Jika MIUI/HyperOS meminta izin &quot;Instal aplikasi dari sumber tidak dikenal&quot;, pilih <strong>Izinkan</strong>.
+                      Buka file APK yang telah diunduh di Redmi Pad 2 &gt; pilih <strong>Pasang / Install</strong>. Paket sudah ditandatangani sertifikat resmi v1 + v2.
                     </p>
                   </div>
                 </div>
@@ -2275,7 +2275,7 @@ export default function BoothKioskPage() {
                   <div>
                     <p className="font-bold text-[#FE0168] font-pixel text-[10px]">BUKA APLIKASI &amp; SAMBUNGKAN KE LAPTOP</p>
                     <p className="text-white/80 text-[10.5px]">
-                      Buka aplikasi <strong>Photobooth Kiosk</strong> di tablet. Masukkan alamat IP laptop ini:
+                      Buka aplikasi <strong>Photobooth HIMATIK</strong> di tablet. Masukkan alamat IP laptop ini:
                     </p>
                     <code className="inline-block mt-1 p-1 bg-black/70 text-[#00E599] font-mono text-[10.5px] border border-white/20 select-all">
                       {tabletConnectionInfo.tabletBoothUrl || 'http://192.168.1.100:3000/booth'}
@@ -2286,7 +2286,7 @@ export default function BoothKioskPage() {
 
               {/* Info Keunggulan Kiosk */}
               <div className="p-2.5 bg-[#FFD84D]/10 border border-[#FFD84D]/40 text-[10.5px] text-[#FFD84D] leading-relaxed">
-                ✨ <strong>Keunggulan Versi APK Kiosk:</strong> Berjalan <strong>100% Layar Penuh (Fullscreen Kiosk)</strong> tanpa bilah URL Google Chrome, layar tablet dijamin <strong>tidak akan tidur/mati</strong> saat pengunjung mengantre, dan izin kamera langsung otomatis!
+                ✨ <strong>Keunggulan Photobooth HIMATIK:</strong> Berjalan <strong>100% Layar Penuh (Fullscreen)</strong> tanpa bilah URL Google Chrome, layar tablet dijamin <strong>tidak akan tidur/mati</strong> saat pengunjung mengantre, dan izin kamera langsung otomatis!
               </div>
 
               {/* Opsi Cadangan: PWA jika ada */}
