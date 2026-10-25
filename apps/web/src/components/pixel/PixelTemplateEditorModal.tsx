@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Upload, Check, AlertCircle, RefreshCw, Wand2, Eye } from 'lucide-react';
+import { X, Upload, Check, AlertCircle, RefreshCw, Wand2, Eye, Palette } from 'lucide-react';
 import type { FrameTemplateItem, FrameSlotItem } from '@/app/api/frames/route';
+import {
+  detectSlotsAndPunchHoles,
+  BENCHMARK_COLORS,
+} from '@/utils/slotColorDetector';
 
 interface PixelTemplateEditorModalProps {
   isOpen: boolean;
@@ -105,6 +109,12 @@ export function PixelTemplateEditorModal({
   const [slotsJson, setSlotsJson] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+
+  // State Deteksi Warna Patokan (Benchmark Chroma Color)
+  const [benchmarkColor, setBenchmarkColor] = useState<string>('#FF00FF');
+  const [isDetecting, setIsDetecting] = useState<boolean>(false);
+  const [detectSuccessMsg, setDetectSuccessMsg] = useState<string | null>(null);
+  const [detectErrorMsg, setDetectErrorMsg] = useState<string | null>(null);
 
   // Inisialisasi data form saat modal dibuka atau template berubah
   useEffect(() => {
@@ -246,10 +256,47 @@ export function PixelTemplateEditorModal({
     reader.readAsDataURL(file);
   };
 
-  // Handler Isi Tata Letak Otomatis
-  const handleAutoFillLayout = () => {
-    const auto = generateAutoSlots(category, photoCount);
-    setSlotsJson(JSON.stringify(auto, null, 2));
+  // Handler Isi Tata Letak Otomatis (Deteksi Warna Patokan atau Fallback Preset)
+  const handleAutoFillLayout = async () => {
+    const targetImage = frameImageBase64 || framePreviewUrl;
+    setDetectSuccessMsg(null);
+    setDetectErrorMsg(null);
+
+    if (targetImage) {
+      setIsDetecting(true);
+      try {
+        const result = await detectSlotsAndPunchHoles(
+          targetImage,
+          benchmarkColor,
+          Number(photoCount),
+          category
+        );
+
+        if (result.success && result.slots.length > 0) {
+          setSlotsJson(JSON.stringify(result.slots, null, 2));
+          if (result.punchedImageBase64) {
+            setFrameImageBase64(result.punchedImageBase64);
+            setFramePreviewUrl(result.punchedImageBase64);
+          }
+          setDetectSuccessMsg(result.message);
+        } else {
+          setDetectErrorMsg(result.message);
+          // Fallback ke preset geometri jika tidak ada kotak warna terdeteksi
+          const auto = generateAutoSlots(category, Number(photoCount));
+          setSlotsJson(JSON.stringify(auto, null, 2));
+        }
+      } catch (err: any) {
+        setDetectErrorMsg(err?.message || 'Gagal memindai warna patokan.');
+        const auto = generateAutoSlots(category, Number(photoCount));
+        setSlotsJson(JSON.stringify(auto, null, 2));
+      } finally {
+        setIsDetecting(false);
+      }
+    } else {
+      const auto = generateAutoSlots(category, Number(photoCount));
+      setSlotsJson(JSON.stringify(auto, null, 2));
+      setDetectSuccessMsg('Tata letak diisi berdasarkan preset geometri standar.');
+    }
   };
 
   // Handler Submit Simpan Perubahan
@@ -595,14 +642,71 @@ export function PixelTemplateEditorModal({
                   Kanvas 1200×1800 px (cetak 4R). photo menunjuk foto ke-berapa (mulai 0), jadi satu foto bisa dipakai di dua slot untuk strip ganda. Foto otomatis dipotong sesuai rasio slot tanpa gepeng.
                 </p>
 
+                {/* PILIHAN WARNA PATOKAN SLOT (BENCHMARK CHROMA COLOR) */}
+                <div className="bg-[#050C38] border border-[#35408E] p-2.5 rounded-none">
+                  <div className="flex items-center gap-1.5 text-[10px] font-pixel-title text-[#FFD84D] mb-1.5">
+                    <Palette className="w-3.5 h-3.5" />
+                    <span>WARNA PATOKAN SLOT DI DESAIN:</span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
+                    {BENCHMARK_COLORS.map((bc) => (
+                      <button
+                        key={bc.id}
+                        type="button"
+                        onClick={() => setBenchmarkColor(bc.hex)}
+                        className={`p-1.5 flex items-center gap-1.5 text-left border transition-all ${
+                          benchmarkColor === bc.hex
+                            ? 'border-[#FFD84D] bg-[#1E2768] shadow-[2px_2px_0_0_#FFD84D]'
+                            : 'border-white/10 bg-[#090D2C] hover:border-white/30'
+                        }`}
+                      >
+                        <span
+                          className="w-3.5 h-3.5 shrink-0 border border-black"
+                          style={{ backgroundColor: bc.hex }}
+                        />
+                        <span className="font-pixel-title text-[8px] truncate text-white">
+                          {bc.name.split(' ')[0]}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[8px] text-[#A9B8FF]/80 leading-tight">
+                    💡 <span className="text-[#FFD84D]">Tips:</span> Warnai kotak jendela foto pada file template Anda dengan warna patokan (misal <b>Magenta #FF00FF</b>). Sistem akan otomatis mendeteksi koordinat dan melubangi area tersebut menjadi transparan!
+                  </p>
+                </div>
+
+                {/* Pesan Sukses / Galat Deteksi Otomatis */}
+                {detectSuccessMsg && (
+                  <div className="bg-[#00E599]/20 border border-[#00E599] p-2 text-[10px] text-[#00E599] flex items-center gap-1.5 font-pixel">
+                    <Check className="w-3.5 h-3.5 text-[#00E599] shrink-0" />
+                    <span>{detectSuccessMsg}</span>
+                  </div>
+                )}
+                {detectErrorMsg && (
+                  <div className="bg-[#FE0168]/20 border border-[#FE0168] p-2 text-[10px] text-[#FFD84D] flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 text-[#FE0168] shrink-0" />
+                    <span>{detectErrorMsg}</span>
+                  </div>
+                )}
+
                 {/* Tombol [ Isi tata letak otomatis ] */}
                 <button
                   type="button"
                   onClick={handleAutoFillLayout}
-                  className="w-full sm:w-auto px-4 py-2 pixel-btn bg-[#1E2768] hover:bg-[#35408E] text-[#5CE1E6] font-pixel-title text-[10px] flex items-center justify-center gap-1.5 border border-[#5CE1E6]/40"
+                  disabled={isDetecting}
+                  className="w-full sm:w-auto px-4 py-2.5 pixel-btn bg-[#1E2768] hover:bg-[#35408E] text-[#5CE1E6] font-pixel-title text-[10px] flex items-center justify-center gap-2 border border-[#5CE1E6]/40 transition-all active:scale-95 disabled:opacity-50"
                 >
-                  <Wand2 className="w-3.5 h-3.5" />
-                  <span>Isi tata letak otomatis</span>
+                  {isDetecting ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#FFD84D]" />
+                      <span>MEMINDAI WARNA PATOKAN...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Wand2 className="w-3.5 h-3.5 text-[#FFD84D]" />
+                      <span>ISI TATA LETAK OTOMATIS (PINDAI WARNA)</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>

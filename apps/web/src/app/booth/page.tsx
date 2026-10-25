@@ -41,6 +41,7 @@ import {
 } from '@/components/pixel/PixelPosterDecorations';
 import { PixelCameraViewfinder } from '@/components/pixel/PixelCameraViewfinder';
 import { PixelPhotoStripDispenser } from '@/components/pixel/PixelPhotoStripDispenser';
+import { getAndAdvanceTicketNumber, getCurrentTicketNumber } from '@/utils/ticketSequence';
 
 type BoothStep = 'standby' | 'welcome' | 'choosing_design' | 'countdown' | 'flash' | 'review' | 'result';
 
@@ -272,10 +273,11 @@ export default function BoothKioskPage() {
     }
   };
 
-  // Mulai sesi foto uji mandiri langsung dari tablet (tanpa harus tunggu admin)
+  // Mulai sesi foto mandiri langsung dari tablet (menggunakan nomor tiket berurut tersinkronisasi)
   const handleQuickDemoStart = () => {
-    setVisitorName('WISUDAWAN TIK 2026');
-    setTicketNumber('#DEMO-01');
+    const nextTicket = getAndAdvanceTicketNumber();
+    setVisitorName(`PENGUNJUNG ${nextTicket}`);
+    setTicketNumber(nextTicket);
     setCapturedPhotos([]);
     setStep('choosing_design');
     if (soundEnabled) retroAudio.playSuccessChime();
@@ -877,15 +879,24 @@ export default function BoothKioskPage() {
               EXPO WISUDA POLITEKNIK JURUSAN TIK 2026
             </h2>
 
-            {/* Tombol Mulai Sesi Mandiri / Uji Coba */}
-            <div className="space-y-2">
+            {/* Tombol Aksi Kios Standby */}
+            <div className="space-y-3">
               <button
                 type="button"
                 onClick={handleQuickDemoStart}
-                className="w-full h-12 px-6 pixel-btn bg-[#E02F75] hover:bg-[#FE0168] text-white text-xs font-pixel-title font-bold flex items-center justify-center gap-2 shadow-[4px_4px_0_0_#6700A3] active:scale-95"
+                className="w-full h-13 px-6 pixel-btn bg-[#E02F75] hover:bg-[#FE0168] text-white text-xs font-pixel-title font-bold flex items-center justify-center gap-2 shadow-[4px_4px_0_0_#6700A3] active:scale-95"
               >
                 <Sparkles className="w-4 h-4 text-[#FFD84D]" />
-                <span>MULAI SESI FOTO MANDIRI (UJI COBA)</span>
+                <span>MULAI SESI FOTO ({getCurrentTicketNumber()})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleOpenWebcamTest}
+                className="w-full h-11 px-6 pixel-btn bg-[#160078] hover:bg-[#1E2768] text-[#5CE1E6] text-xs font-pixel-title font-bold flex items-center justify-center gap-2 border-2 border-[#5CE1E6]/50 shadow-[3px_3px_0_0_#050C38] active:scale-95"
+              >
+                <Camera className="w-4 h-4 text-[#FFD84D]" />
+                <span>🎥 UJI COBA KAMERA / TEST TRIAL</span>
               </button>
 
               <div className="p-2 bg-[#050C38]/80 border border-[#4B57B2]/40 text-[10px] text-[#A9B8FF] font-pixel-title flex items-center justify-center gap-2">

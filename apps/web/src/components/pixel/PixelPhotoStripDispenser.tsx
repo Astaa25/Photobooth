@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Download, Check, QrCode, ArrowDown, CheckCircle2 } from 'lucide-react';
+import { Sparkles, Download, Check, QrCode, ArrowDown, CheckCircle2, ExternalLink, Copy } from 'lucide-react';
+import QRCode from 'qrcode';
 import { PixelCrossStar } from './PixelPosterDecorations';
 import { PixelPrinterIcon } from './PixelIcons';
 import {
@@ -10,6 +11,7 @@ import {
   type PhotoSlotConfig,
 } from '@/utils/photoDownloadHelper';
 import { retroAudio } from '@/utils/audio';
+import { incrementPrintedSheets } from '@/utils/printCounter';
 
 interface PixelPhotoStripDispenserProps {
   visitorName: string;
@@ -37,6 +39,9 @@ export function PixelPhotoStripDispenser({
   const [dispensed, setDispensed] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [galleryFullUrl, setGalleryFullUrl] = useState<string>('');
+  const [copiedLink, setCopiedLink] = useState(false);
 
   useEffect(() => {
     // Animasi bertahap meluncur keluar setelah komponen di-mount
@@ -45,6 +50,35 @@ export function PixelPhotoStripDispenser({
     }, 200);
     return () => clearTimeout(t);
   }, []);
+
+  // Generate QR Code dinamis mengarah ke galeri foto tiket pengunjung
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    let baseUrl = window.location.origin;
+    try {
+      const publicUrl = localStorage.getItem('photobooth_public_url');
+      if (publicUrl && publicUrl.startsWith('http')) {
+        baseUrl = publicUrl.replace(/\/$/, '');
+      }
+    } catch {}
+
+    const cleanTicket = ticketNumber.replace('#', '').trim();
+    const targetUrl = `${baseUrl}/gallery?ticket=${encodeURIComponent(cleanTicket)}`;
+    setGalleryFullUrl(targetUrl);
+
+    QRCode.toDataURL(targetUrl, {
+      width: 256,
+      margin: 1,
+      color: {
+        dark: '#050C38',
+        light: '#FFFFFF',
+      },
+      errorCorrectionLevel: 'M',
+    })
+      .then((url) => setQrDataUrl(url))
+      .catch((err) => console.error('Gagal membuat QR Code:', err));
+  }, [ticketNumber]);
 
   // Tangani unduh hasil foto strip komposit
   const handleDownloadStrip = async () => {
@@ -62,6 +96,8 @@ export function PixelPhotoStripDispenser({
         templateName,
         fileName: `Photobooth_${ticketNumber.replace('#', '')}_${Date.now()}.jpg`,
       });
+      // Catat 1 lembar cetak ke counter statistik admin
+      incrementPrintedSheets(1);
       setDownloadSuccess(true);
       retroAudio.playSuccessChime();
       setTimeout(() => setDownloadSuccess(false), 3000);
@@ -228,10 +264,53 @@ export function PixelPhotoStripDispenser({
               )}
             </button>
 
-            {/* Kotak QR Code Pixel */}
-            <div className="w-44 h-44 mx-auto bg-white p-3 pixel-box flex items-center justify-center mb-4">
-              <QrCode className="w-36 h-36 text-black" />
+            {/* Kotak QR Code Pixel Asli Dinamis */}
+            <div className="w-52 mx-auto bg-white p-3 pixel-box flex flex-col items-center justify-center mb-3">
+              {qrDataUrl ? (
+                <img
+                  src={qrDataUrl}
+                  alt={`QR Code Galeri Tiket ${ticketNumber}`}
+                  className="w-44 h-44 pixel-art object-contain"
+                />
+              ) : (
+                <div className="w-44 h-44 flex flex-col items-center justify-center text-black/60 gap-2">
+                  <QrCode className="w-12 h-12 animate-pulse" />
+                  <span className="font-pixel-title text-[9px]">MEMBUAT QR CODE...</span>
+                </div>
+              )}
+              <span className="text-[8px] font-pixel-title text-[#050C38] mt-1.5 text-center">
+                PINDAI UNTUK SIMPAN KE HP
+              </span>
             </div>
+
+            {/* Tautan Langsung & Salin URL Galeri */}
+            {galleryFullUrl && (
+              <div className="flex items-center justify-center gap-2 mb-4">
+                <a
+                  href={galleryFullUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1 bg-[#131947] hover:bg-[#1E2768] text-[#5CE1E6] border border-[#5CE1E6]/40 font-pixel-title text-[9px] flex items-center gap-1 transition-colors"
+                  title="Buka galeri di tab baru"
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  <span>BUKA GALERI</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(galleryFullUrl);
+                    setCopiedLink(true);
+                    setTimeout(() => setCopiedLink(false), 2000);
+                  }}
+                  className="px-2.5 py-1 bg-[#131947] hover:bg-[#1E2768] text-[#FFD84D] border border-[#FFD84D]/40 font-pixel-title text-[9px] flex items-center gap-1 transition-colors"
+                  title="Salin tautan galeri"
+                >
+                  {copiedLink ? <Check className="w-3 h-3 text-[#00E599]" /> : <Copy className="w-3 h-3" />}
+                  <span>{copiedLink ? 'TERSALIN!' : 'SALIN URL'}</span>
+                </button>
+              </div>
+            )}
 
             <p className="font-pixel-title text-[10px] text-[#5CE1E6] mb-5">
               TIKET: <span className="text-[#FFD84D]">{ticketNumber}</span> &bull; {visitorName}

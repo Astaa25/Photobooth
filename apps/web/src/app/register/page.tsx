@@ -7,6 +7,7 @@ import { VisitorRegistrationSchema } from '@photobooth/shared';
 import { PixelTicketIcon } from '@/components/pixel/PixelIcons';
 import { PixelCrossStar, PixelStreetLamp, PixelVendingMachine } from '@/components/pixel/PixelPosterDecorations';
 import { retroAudio } from '@/utils/audio';
+import { getAndAdvanceTicketNumber } from '@/utils/ticketSequence';
 
 export default function RegisterPage() {
   const [nickname, setNickname] = useState('');
@@ -35,11 +36,10 @@ export default function RegisterPage() {
     setIsSubmitting(true);
 
     try {
-      // Simulasi panggilan pendaftaran antrean
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // Panggilan pendaftaran antrean berurut (tanpa nomor acak)
+      await new Promise((resolve) => setTimeout(resolve, 300));
 
-      const randomTicketNum = Math.floor(Math.random() * 80) + 1;
-      const formattedNum = `#${String(randomTicketNum).padStart(3, '0')}`;
+      const formattedNum = getAndAdvanceTicketNumber();
 
       retroAudio.playSuccessChime();
 

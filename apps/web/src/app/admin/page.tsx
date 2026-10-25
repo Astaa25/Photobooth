@@ -59,6 +59,15 @@ import {
 } from '@/utils/webcamHelper';
 import { PixelTemplateEditorModal } from '@/components/pixel/PixelTemplateEditorModal';
 import type { FrameTemplateItem } from '@/app/api/frames/route';
+import {
+  getTotalPrintedSheets,
+  incrementPrintedSheets,
+  resetPrintedSheets,
+} from '@/utils/printCounter';
+import {
+  getAndAdvanceTicketNumber,
+  getCurrentTicketNumber,
+} from '@/utils/ticketSequence';
 
 // Tipe Data Kategori Kolom yang Dapat Dikonfigurasi
 export interface KanbanCategory {
@@ -179,6 +188,9 @@ export default function AdminDashboardPage() {
   // State Spooler Cetak
   const [printingItem, setPrintingItem] = useState<QueueItem | null>(null);
   const [printCopies, setPrintCopies] = useState<number>(2);
+  const [totalPrintedSheets, setTotalPrintedSheets] = useState<number>(0);
+  const [newVisitorNickname, setNewVisitorNickname] = useState('');
+  const [isAddingVisitor, setIsAddingVisitor] = useState(false);
 
   // Auto-Refresh & Heartbeat Sync
   const [lastRefreshedAt, setLastRefreshedAt] = useState<string>('Baru saja');
@@ -200,6 +212,7 @@ export default function AdminDashboardPage() {
   // 1. Muat Kategori & Template Kustom dari Server & LocalStorage
   useEffect(() => {
     try {
+      setTotalPrintedSheets(getTotalPrintedSheets());
       const savedCats = localStorage.getItem('photobooth_kanban_categories');
       if (savedCats) {
         const parsed = JSON.parse(savedCats);
@@ -269,6 +282,11 @@ export default function AdminDashboardPage() {
           (event.data.cameraSource === 'canon' || event.data.cameraSource === 'webcam')
         ) {
           setActiveCamera(event.data.cameraSource);
+        }
+
+        // Sinkronisasi pembaruan jumlah lembar cetak
+        if (event.data?.type === 'PRINT_COUNT_UPDATED' && typeof event.data.totalPrintedSheets === 'number') {
+          setTotalPrintedSheets(event.data.totalPrintedSheets);
         }
       };
     } catch {}
@@ -536,14 +554,46 @@ export default function AdminDashboardPage() {
   const handlePrint = (item: QueueItem) => {
     if (soundEnabled) retroAudio.playPrintSound();
     setPrintingItem(item);
-    showToast(`Mengirim tugas cetak ${printCopies}x lembar 4R ke Epson L300...`);
+    const copies = item.printCopies || printCopies || 1;
+    const updated = incrementPrintedSheets(copies);
+    setTotalPrintedSheets(updated);
+    showToast(`Mengirim tugas cetak ${copies}x lembar 4R ke Epson L300...`);
     setTimeout(() => {
       setPrintingItem(null);
-      showToast(`Cetak selesai untuk ${item.nickname}!`);
+      showToast(`Cetak selesai untuk ${item.nickname}! (${copies} lembar 4R dicatat, total: ${updated})`);
       setQueue((prev) =>
         prev.map((q) => (q.id === item.id ? { ...q, status: 'DONE' } : q))
       );
     }, 2000);
+  };
+
+  // Tambah Antrean Manual dengan nomor tiket urut otomatis
+  const handleAddManualQueue = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newVisitorNickname.trim()) return;
+    const nextNum = getAndAdvanceTicketNumber();
+    const newItem: QueueItem = {
+      id: `manual-${Date.now()}`,
+      number: nextNum,
+      nickname: newVisitorNickname.trim(),
+      status: 'QUEUED',
+      registeredAt: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+      printCopies: 1,
+    };
+    setQueue((prev) => [newItem, ...prev]);
+    setNewVisitorNickname('');
+    setIsAddingVisitor(false);
+    if (soundEnabled) retroAudio.playSuccessChime();
+    showToast(`Antrean ${nextNum} (${newItem.nickname}) berhasil ditambahkan!`);
+  };
+
+  // Reset counter lembar cetak
+  const handleResetPrintCount = () => {
+    if (confirm('Atur ulang total lembar tercetak menjadi 0? (Gunakan saat isi ulang kertas cetak atau reset harian)')) {
+      resetPrintedSheets(0);
+      setTotalPrintedSheets(0);
+      showToast('Counter lembar cetak diatur ulang ke 0.');
+    }
   };
 
   // Handler Upload File Gambar Frame (PNG)
@@ -924,12 +974,130 @@ export default function AdminDashboardPage() {
               TAB 1: PAPAN ANTREAN PENGUNJUNG (5 KOLOM MUAT PRESISI DI 1 LAYAR)
               ================================================================= */}
           {activeTab === 'board' && (
-            <div
-              className="grid gap-2.5 items-start w-full"
-              style={{
-                gridTemplateColumns: `repeat(${categories.filter((c) => c.active).length}, minmax(0, 1fr))`,
-              }}
-            >
+            <div className="flex flex-col gap-3 w-full">
+              {/* DASHBOARD STATISTIK AWAL ADMIN (TOTAL LEMBAR TERCETAK, ANTREAN, SESI AKTIF) */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+                {/* 1. LEMBAR TERCETAK (REQUEST USER: DASHBOARD AWAL ISINYA ADA BERAPA LEMBAR DAH TERCETAK) */}
+                <div className="bg-[#0C1230]/95 pixel-box p-3 border-2 border-[#00E599] flex flex-col justify-between shadow-[3px_3px_0_0_#050C38]">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-pixel-title text-[#A9B8FF] flex items-center gap-1.5">
+                      <PixelPrinterIcon size={14} />
+                      LEMBAR TERCETAK
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleResetPrintCount}
+                      className="text-[8px] font-pixel-title text-white/50 hover:text-[#FE0168] underline"
+                      title="Atur ulang counter lembar cetak"
+                    >
+                      RESET
+                    </button>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-pixel-title text-[#00E599] font-bold">
+                      {totalPrintedSheets}
+                    </span>
+                    <span className="text-[10px] font-pixel-title text-[#FFD84D]">LEMBAR 4R</span>
+                  </div>
+                  <span className="text-[8px] text-[#00E599] flex items-center gap-1 mt-1">
+                    <span className="w-1.5 h-1.5 bg-[#00E599] animate-pulse" />
+                    Spooler Epson L300 Ready
+                  </span>
+                </div>
+
+                {/* 2. TOTAL ANTREAN DENGAN NOMOR BERIKUTNYA BERURUT */}
+                <div className="bg-[#0C1230]/95 pixel-box p-3 border-2 border-[#5CE1E6] flex flex-col justify-between shadow-[3px_3px_0_0_#050C38]">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] font-pixel-title text-[#A9B8FF]">TOTAL ANTREAN</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsAddingVisitor(!isAddingVisitor)}
+                      className="px-1.5 py-0.5 bg-[#1E2768] hover:bg-[#5CE1E6] hover:text-[#050C38] text-[#5CE1E6] text-[8px] font-pixel-title flex items-center gap-1 border border-[#5CE1E6]/40"
+                    >
+                      <Plus className="w-2.5 h-2.5" />
+                      <span>TAMBAH</span>
+                    </button>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-pixel-title text-[#5CE1E6] font-bold">
+                      {queue.length}
+                    </span>
+                    <span className="text-[10px] font-pixel-title text-[#A9B8FF]">PENGUNJUNG</span>
+                  </div>
+                  <span className="text-[8px] text-[#FFD84D] truncate">
+                    No. Berikutnya: {getCurrentTicketNumber()}
+                  </span>
+                </div>
+
+                {/* 3. SESI AKTIF BILIK */}
+                <div className="bg-[#0C1230]/95 pixel-box p-3 border-2 border-[#FE0168] flex flex-col justify-between shadow-[3px_3px_0_0_#050C38]">
+                  <span className="text-[10px] font-pixel-title text-[#A9B8FF] mb-1">SESI BILIK AKTIF</span>
+                  <div className="truncate">
+                    <span className="text-base sm:text-lg font-pixel-title text-[#FE0168] font-bold truncate block">
+                      {queue.find((q) => q.status === 'IN_SESSION')?.nickname || 'STANDBY'}
+                    </span>
+                  </div>
+                  <span className="text-[8px] text-[#FFD84D]">
+                    {queue.some((q) => q.status === 'IN_SESSION') ? '● Bilik Sedang Mengambil Foto' : '○ Menunggu Dipanggil ke Bilik'}
+                  </span>
+                </div>
+
+                {/* 4. TOTAL SELESAI */}
+                <div className="bg-[#0C1230]/95 pixel-box p-3 border-2 border-[#FFD84D] flex flex-col justify-between shadow-[3px_3px_0_0_#050C38]">
+                  <span className="text-[10px] font-pixel-title text-[#A9B8FF] mb-1">SELESAI FOTO</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-pixel-title text-[#FFD84D] font-bold">
+                      {queue.filter((q) => q.status === 'DONE').length}
+                    </span>
+                    <span className="text-[10px] font-pixel-title text-[#00E599]">SIAP AMBIL</span>
+                  </div>
+                  <span className="text-[8px] text-[#A9B8FF]">
+                    Cetak &amp; Galeri Unduh Tersedia
+                  </span>
+                </div>
+              </div>
+
+              {/* Form Tambah Antrean Manual Cepat jika Dibuka */}
+              {isAddingVisitor && (
+                <form
+                  onSubmit={handleAddManualQueue}
+                  className="bg-[#131947] border-2 border-[#5CE1E6] p-3 flex flex-wrap items-center gap-3 animate-fadeIn"
+                >
+                  <span className="font-pixel-title text-[10px] text-[#FFD84D]">
+                    TAMBAH ANTREAN CEPAT ({getCurrentTicketNumber()}):
+                  </span>
+                  <input
+                    type="text"
+                    value={newVisitorNickname}
+                    onChange={(e) => setNewVisitorNickname(e.target.value)}
+                    placeholder="Nama panggilan / grup wisudawan..."
+                    className="flex-1 min-w-[200px] h-8 px-2.5 bg-[#050C38] border border-[#4B57B2] text-xs text-white outline-none focus:border-[#5CE1E6]"
+                    autoFocus
+                  />
+                  <button
+                    type="submit"
+                    className="h-8 px-4 pixel-btn bg-[#00E599] text-[#050C38] text-[10px] font-pixel-title font-bold flex items-center gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>SIMPAN &amp; AMBIL TIKET</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingVisitor(false)}
+                    className="h-8 px-3 pixel-btn bg-[#FE0168] text-white text-[10px] font-pixel-title"
+                  >
+                    BATAL
+                  </button>
+                </form>
+              )}
+
+              {/* Papan Kanban Kolom Antrean */}
+              <div
+                className="grid gap-2.5 items-start w-full"
+                style={{
+                  gridTemplateColumns: `repeat(${categories.filter((c) => c.active).length}, minmax(0, 1fr))`,
+                }}
+              >
               {categories
                 .filter((cat) => cat.active)
                 .map((category) => {
@@ -1129,6 +1297,7 @@ export default function AdminDashboardPage() {
                     </div>
                   );
                 })}
+              </div>
             </div>
           )}
 
