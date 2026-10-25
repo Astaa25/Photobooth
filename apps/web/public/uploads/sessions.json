@@ -1,0 +1,37 @@
+[
+  {
+    "id": "sess-1792925533133",
+    "number": "#001",
+    "nickname": "Pengunjung Wisuda #001",
+    "time": "17.52 WIB",
+    "date": "25 Oktober 2026",
+    "template": "NIGHT CITY STRIP 4R",
+    "frameImage": "/assets/frames/night-city-strip.png",
+    "canvasWidth": 1200,
+    "canvasHeight": 1800,
+    "photos": [
+      {
+        "id": 1,
+        "color": "#1D4ED8",
+        "label": "Pose #1"
+      },
+      {
+        "id": 2,
+        "color": "#BE185D",
+        "label": "Pose #2"
+      },
+      {
+        "id": 3,
+        "color": "#047857",
+        "label": "Pose #3"
+      },
+      {
+        "id": 4,
+        "color": "#B45309",
+        "label": "Pose #4"
+      }
+    ],
+    "accentColor": "#00E599",
+    "createdAt": 1792925533149
+  }
+]

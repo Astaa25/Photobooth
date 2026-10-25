@@ -18,7 +18,12 @@ import {
 import { PixelCameraIcon, PixelPrinterIcon, PixelTicketIcon } from '@/components/pixel/PixelIcons';
 import { PixelCrossStar, PixelStreetLamp, PixelVendingMachine } from '@/components/pixel/PixelPosterDecorations';
 import { retroAudio } from '@/utils/audio';
-import { downloadCompositePhotoStrip, downloadSinglePhoto } from '@/utils/photoDownloadHelper';
+import {
+  downloadCompositePhotoStrip,
+  downloadSinglePhoto,
+  getDefaultSlots,
+  type PhotoSlotConfig,
+} from '@/utils/photoDownloadHelper';
 
 interface VisitorGalleryItem {
   id: string;
@@ -27,8 +32,13 @@ interface VisitorGalleryItem {
   time: string;
   date: string;
   template: string;
+  frameImage?: string;
+  slots?: PhotoSlotConfig[];
+  canvasWidth?: number;
+  canvasHeight?: number;
   photos: { id: number; color: string; label: string }[];
   accentColor: string;
+  isRealSession?: boolean;
 }
 
 const DEFAULT_GALLERIES: VisitorGalleryItem[] = [
@@ -135,36 +145,182 @@ export default function GalleryPage() {
   // Status Pemutar Video Singkat Foto (otomatis berputar tiada henti)
   const [videoFrameIdx, setVideoFrameIdx] = useState(0);
 
-  // Ambil data sesi yang tersimpan dari booth jika ada
+  // Muat data sesi yang tersimpan dari Server /api/sessions dan localStorage
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('photobooth_completed_sessions');
-      if (raw) {
-        const extra = JSON.parse(raw);
-        if (Array.isArray(extra) && extra.length > 0) {
-          const formattedExtra: VisitorGalleryItem[] = extra.map((item: any, i: number) => ({
-            id: item.id || `extra-${i}`,
-            number: item.number || `#09${i}`,
-            nickname: item.nickname || 'Pengunjung Baru',
-            time: item.time || '12:00 WIB',
-            date: '24 Oktober 2026',
-            template: item.template || 'NIGHT CITY STRIP 4R',
-            accentColor: '#FE0168',
-            photos: [
-              { id: 1, color: '#1D4ED8', label: 'Foto 1' },
-              { id: 2, color: '#BE185D', label: 'Foto 2' },
-              { id: 3, color: '#047857', label: 'Foto 3' },
-              { id: 4, color: '#B45309', label: 'Foto 4' },
-            ],
-          }));
+    let isCancelled = false;
 
-          // Gabungkan tanpa duplikasi nomor
-          const existingNums = new Set(DEFAULT_GALLERIES.map((g) => g.number));
-          const newUnique = formattedExtra.filter((g) => !existingNums.has(g.number));
-          setGalleries([...newUnique, ...DEFAULT_GALLERIES]);
+    const loadAllGalleries = async () => {
+      let serverSessions: any[] = [];
+      try {
+        const res = await fetch('/api/sessions');
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          serverSessions = json.data;
+        }
+      } catch (err) {
+        console.warn('Gagal membaca sesi server:', err);
+      }
+
+      let localSessions: any[] = [];
+      try {
+        const raw = localStorage.getItem('photobooth_completed_sessions');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) localSessions = parsed;
+        }
+      } catch {}
+
+      // Format dan gabungkan sesi nyata (server + local), deduplikasi berdasarkan nomor tiket
+      const realSessionsMap = new Map<string, VisitorGalleryItem>();
+
+      // 1. Masukkan Server Sessions
+      for (const item of serverSessions) {
+        const num = (item.number || '#001').startsWith('#') ? item.number : `#${item.number}`;
+        const rawPhotos = Array.isArray(item.photos) ? item.photos : [];
+        const formattedPhotos = rawPhotos.map((p: any, idx: number) => {
+          if (typeof p === 'string') {
+            return { id: idx + 1, color: p, label: `Pose #${idx + 1}` };
+          }
+          return { id: p.id || idx + 1, color: p.color || p.url || '#1D4ED8', label: p.label || `Pose #${idx + 1}` };
+        });
+
+        realSessionsMap.set(num.toLowerCase(), {
+          id: item.id || `server-${num}`,
+          number: num,
+          nickname: item.nickname || 'Pengunjung',
+          time: item.time || '12:00 WIB',
+          date: item.date || '24 Oktober 2026',
+          template: item.template || 'NIGHT CITY STRIP 4R',
+          frameImage: item.frameImage,
+          slots: item.slots,
+          canvasWidth: item.canvasWidth || 1200,
+          canvasHeight: item.canvasHeight || 1800,
+          photos: formattedPhotos.length > 0 ? formattedPhotos : [
+            { id: 1, color: '#1D4ED8', label: 'Pose #1' },
+            { id: 2, color: '#BE185D', label: 'Pose #2' },
+            { id: 3, color: '#047857', label: 'Pose #3' },
+            { id: 4, color: '#B45309', label: 'Pose #4' },
+          ],
+          accentColor: item.accentColor || '#00E599',
+          isRealSession: true,
+        });
+      }
+
+      // 2. Masukkan Local Sessions (jika ada yang lebih baru)
+      for (const item of localSessions) {
+        const num = (item.number || '#001').startsWith('#') ? item.number : `#${item.number}`;
+        const rawPhotos = Array.isArray(item.photos) ? item.photos : [];
+        const formattedPhotos = rawPhotos.map((p: any, idx: number) => {
+          if (typeof p === 'string') {
+            return { id: idx + 1, color: p, label: `Pose #${idx + 1}` };
+          }
+          return { id: p.id || idx + 1, color: p.color || p.url || '#1D4ED8', label: p.label || `Pose #${idx + 1}` };
+        });
+
+        if (!realSessionsMap.has(num.toLowerCase()) || formattedPhotos.length > 0) {
+          realSessionsMap.set(num.toLowerCase(), {
+            id: item.id || `local-${num}`,
+            number: num,
+            nickname: item.nickname || 'Pengunjung',
+            time: item.time || '12:00 WIB',
+            date: item.date || '24 Oktober 2026',
+            template: item.template || 'NIGHT CITY STRIP 4R',
+            frameImage: item.frameImage,
+            slots: item.slots,
+            canvasWidth: item.canvasWidth || 1200,
+            canvasHeight: item.canvasHeight || 1800,
+            photos: formattedPhotos.length > 0 ? formattedPhotos : [
+              { id: 1, color: '#1D4ED8', label: 'Pose #1' },
+              { id: 2, color: '#BE185D', label: 'Pose #2' },
+              { id: 3, color: '#047857', label: 'Pose #3' },
+              { id: 4, color: '#B45309', label: 'Pose #4' },
+            ],
+            accentColor: item.accentColor || '#00E599',
+            isRealSession: true,
+          });
         }
       }
+
+      const realList = Array.from(realSessionsMap.values());
+      const realNums = new Set(realList.map((r) => r.number.toLowerCase()));
+
+      // Saring DEFAULT_GALLERIES: jangan tampilkan dummy jika nomor tiket sudah ada sesi aslinya
+      const remainingDefaults = DEFAULT_GALLERIES.filter(
+        (d) => !realNums.has(d.number.toLowerCase())
+      );
+
+      const merged = [...realList, ...remainingDefaults];
+      if (isCancelled) return;
+      setGalleries(merged);
+
+      // Cek parameter ?ticket=... pada URL (misal dari scan QR Code di dispenser bilik foto)
+      if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search);
+        const ticketParam = urlParams.get('ticket')?.replace('#', '').trim().toLowerCase();
+        if (ticketParam) {
+          const match = merged.find(
+            (g) => g.number.replace('#', '').trim().toLowerCase() === ticketParam
+          );
+          if (match) {
+            setSelectedVisitor(match);
+            setVideoFrameIdx(0);
+          } else {
+            // Coba fetch langsung spesifik tiket dari API jika baru saja selesai
+            fetch(`/api/sessions?ticket=${encodeURIComponent(ticketParam)}`)
+              .then((r) => r.json())
+              .then((json) => {
+                if (json.success && json.data) {
+                  const s = json.data;
+                  const rawPhotos = Array.isArray(s.photos) ? s.photos : [];
+                  const formattedPhotos = rawPhotos.map((p: any, idx: number) => {
+                    if (typeof p === 'string') {
+                      return { id: idx + 1, color: p, label: `Pose #${idx + 1}` };
+                    }
+                    return { id: p.id || idx + 1, color: p.color || p.url || '#1D4ED8', label: p.label || `Pose #${idx + 1}` };
+                  });
+
+                  const item: VisitorGalleryItem = {
+                    id: s.id,
+                    number: s.number,
+                    nickname: s.nickname,
+                    time: s.time,
+                    date: s.date,
+                    template: s.template,
+                    frameImage: s.frameImage,
+                    slots: s.slots,
+                    canvasWidth: s.canvasWidth,
+                    canvasHeight: s.canvasHeight,
+                    photos: formattedPhotos,
+                    accentColor: s.accentColor || '#00E599',
+                    isRealSession: true,
+                  };
+                  setSelectedVisitor(item);
+                  setGalleries((prev) => [item, ...prev.filter((p) => p.number.toLowerCase() !== item.number.toLowerCase())]);
+                }
+              })
+              .catch(() => {});
+          }
+        }
+      }
+    };
+
+    loadAllGalleries();
+
+    // Dengarkan event sinkronisasi real-time jika ada pemotretan baru selesai
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('photobooth_session_sync');
+      channel.onmessage = (event) => {
+        if (event.data?.type === 'SESSION_COMPLETED') {
+          loadAllGalleries();
+        }
+      };
     } catch {}
+
+    return () => {
+      isCancelled = true;
+      if (channel) channel.close();
+    };
   }, []);
 
   // Animasi Pemutar Video Singkat Foto (slideshow berkecepatan 1.4 detik per pose secara berkelanjutan)
@@ -203,6 +359,10 @@ export default function GalleryPage() {
       const fileName = `${selectedVisitor.nickname}_Frame_4R.jpg`;
       await downloadCompositePhotoStrip({
         photos: selectedVisitor.photos.map((p) => p.color),
+        frameImage: selectedVisitor.frameImage,
+        slots: selectedVisitor.slots,
+        canvasWidth: selectedVisitor.canvasWidth || 1200,
+        canvasHeight: selectedVisitor.canvasHeight || 1800,
         visitorName: selectedVisitor.nickname,
         ticketNumber: selectedVisitor.number,
         templateName: selectedVisitor.template,
@@ -242,9 +402,13 @@ export default function GalleryPage() {
     retroAudio.playPrintSound();
     setDownloadingZip(true);
     try {
-      // 1. Unduh Frame 4R
+      // 1. Unduh Frame 4R dengan gambar bingkai dan koordinat slot asli
       await downloadCompositePhotoStrip({
         photos: selectedVisitor.photos.map((p) => p.color),
+        frameImage: selectedVisitor.frameImage,
+        slots: selectedVisitor.slots,
+        canvasWidth: selectedVisitor.canvasWidth || 1200,
+        canvasHeight: selectedVisitor.canvasHeight || 1800,
         visitorName: selectedVisitor.nickname,
         ticketNumber: selectedVisitor.number,
         templateName: selectedVisitor.template,
@@ -258,7 +422,6 @@ export default function GalleryPage() {
         await downloadSinglePhoto(
           photo.color,
           `${selectedVisitor.nickname}_Foto_${photo.id}.jpg`,
-          `${selectedVisitor.nickname} - Foto #${photo.id}`
         );
       }
 
@@ -368,15 +531,29 @@ export default function GalleryPage() {
               {/* Pratinjau Foto Kotak Miniatur (Photo Strip Thumbnail) */}
               <div className="relative aspect-[4/3] w-full bg-black/60 border-2 border-[#4B57B2] mb-4 overflow-hidden p-2 flex items-center justify-center">
                 <div className="grid grid-cols-2 gap-1.5 w-full h-full">
-                  {visitor.photos.map((p, idx) => (
-                    <div
-                      key={idx}
-                      style={{ backgroundColor: p.color }}
-                      className="flex items-center justify-center text-[9px] font-pixel-title text-white/80 border border-white/20"
-                    >
-                      #{idx + 1}
-                    </div>
-                  ))}
+                  {visitor.photos.map((p, idx) => {
+                    const isImg =
+                      p.color.startsWith('data:image') ||
+                      p.color.startsWith('/') ||
+                      p.color.startsWith('http');
+                    return (
+                      <div
+                        key={idx}
+                        style={{ backgroundColor: isImg ? '#000' : p.color }}
+                        className="overflow-hidden flex items-center justify-center text-[9px] font-pixel-title text-white/80 border border-white/20 relative"
+                      >
+                        {isImg ? (
+                          <img
+                            src={p.color}
+                            alt={`Pose ${idx + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          `#${idx + 1}`
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {/* Overlay Hover Icon Buka */}
@@ -398,7 +575,7 @@ export default function GalleryPage() {
 
               {/* Badge Jumlah File (4 Foto + Frame + Video) */}
               <div className="flex items-center justify-between text-[10px] font-pixel-title text-[#00E599] pt-2 border-t border-[#4B57B2]/40">
-                <span>6 FILES TERSEDIA</span>
+                <span>{visitor.photos.length + 2} FILES TERSEDIA</span>
                 <span className="text-[#E02F75] group-hover:translate-x-1 transition-transform">
                   LIHAT &gt;&gt;
                 </span>
@@ -448,7 +625,7 @@ export default function GalleryPage() {
                 BERKAS FOTO &bull; {selectedVisitor.nickname.toUpperCase()}
               </h2>
               <p className="text-xs text-white/70 mt-1">
-                Total 6 File Digital: 4 Foto Individual Canon RAW + 1 Foto Frame 4R + 1 Video Singkat Slideshow
+                Total {selectedVisitor.photos.length + 2} File Digital: {selectedVisitor.photos.length} Foto Individual Canon RAW/JPG + 1 Foto Frame 4R + 1 Video Singkat Slideshow
               </p>
 
               {/* Tombol Unduh Semua (ZIP) */}
@@ -495,14 +672,31 @@ export default function GalleryPage() {
                   {/* Pemutar Video Singkat Retro */}
                   <div className="relative aspect-[16/10] bg-black border-2 border-[#5CE1E6] overflow-hidden flex flex-col items-center justify-center pixel-crt">
                     {/* Frame Foto Aktif */}
-                    <div
-                      className="w-full h-full flex flex-col items-center justify-center transition-colors duration-300"
-                      style={{ backgroundColor: selectedVisitor.photos[videoFrameIdx]?.color }}
-                    >
-                      <span className="bg-black/70 px-3 py-1 font-pixel-title text-xs text-white border border-white/30">
-                        {selectedVisitor.photos[videoFrameIdx]?.label || `Foto ${videoFrameIdx + 1}`}
-                      </span>
-                    </div>
+                    {(() => {
+                      const cur = selectedVisitor.photos[videoFrameIdx] || selectedVisitor.photos[0];
+                      const isImg =
+                        cur?.color.startsWith('data:image') ||
+                        cur?.color.startsWith('/') ||
+                        cur?.color.startsWith('http');
+                      return (
+                        <div
+                          className="w-full h-full flex flex-col items-center justify-center transition-colors duration-300 relative overflow-hidden"
+                          style={{ backgroundColor: isImg ? '#000' : cur?.color }}
+                        >
+                          {isImg ? (
+                            <img
+                              src={cur.color}
+                              alt={cur.label}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span className="bg-black/70 px-3 py-1 font-pixel-title text-xs text-white border border-white/30">
+                              {cur?.label || `Foto ${videoFrameIdx + 1}`}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {/* HUD Overlay Video */}
                     <div className="absolute top-2 left-2 flex items-center gap-1.5 text-[9px] font-pixel-title bg-black/60 px-1.5 py-0.5 text-[#FE0168]">
@@ -549,25 +743,80 @@ export default function GalleryPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                  {/* Pratinjau Frame 4R */}
-                  <div className="w-40 sm:w-48 mx-auto bg-gradient-to-b from-[#0C1230] to-[#160078] border-4 border-[#E02F75] p-2.5 shadow-[4px_4px_0_0_#050C38]">
-                    <div className="text-center font-pixel-title text-[7px] text-[#FFD84D] border-b border-white/20 pb-1 mb-1.5">
-                      EXPO WISUDA TIK 2026
+                  {/* Pratinjau Frame 4R Presisi */}
+                  <div className="relative w-44 sm:w-52 aspect-[2/3] mx-auto bg-black border-4 border-[#E02F75] overflow-hidden shadow-[4px_4px_0_0_#050C38]">
+                    {/* Layer Slot Foto Pengunjung */}
+                    <div className="absolute inset-0 pointer-events-none">
+                      {(selectedVisitor.slots && selectedVisitor.slots.length > 0
+                        ? selectedVisitor.slots
+                        : getDefaultSlots(
+                            selectedVisitor.photos.length || 4,
+                            selectedVisitor.canvasWidth || 1200,
+                            selectedVisitor.canvasHeight || 1800
+                          )
+                      ).map((slot, idx) => {
+                        const photoIdx =
+                          slot.photo !== undefined
+                            ? slot.photo
+                            : slot.source_index !== undefined
+                            ? slot.source_index
+                            : idx;
+                        const p =
+                          selectedVisitor.photos[photoIdx % selectedVisitor.photos.length];
+                        const isImg =
+                          p &&
+                          (p.color.startsWith('data:image') ||
+                            p.color.startsWith('/') ||
+                            p.color.startsWith('http'));
+
+                        const cw = selectedVisitor.canvasWidth || 1200;
+                        const ch = selectedVisitor.canvasHeight || 1800;
+                        const leftPct = (slot.x / cw) * 100;
+                        const topPct = (slot.y / ch) * 100;
+                        const widthPct = (slot.width / cw) * 100;
+                        const heightPct = (slot.height / ch) * 100;
+
+                        return (
+                          <div
+                            key={idx}
+                            style={{
+                              position: 'absolute',
+                              left: `${leftPct}%`,
+                              top: `${topPct}%`,
+                              width: `${widthPct}%`,
+                              height: `${heightPct}%`,
+                              backgroundColor: isImg ? '#000' : p?.color || '#1D4ED8',
+                            }}
+                            className="overflow-hidden flex items-center justify-center border border-black/30"
+                          >
+                            {isImg ? (
+                              <img
+                                src={p.color}
+                                alt={`Pose ${photoIdx + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <span className="font-pixel-title text-[7px] text-white">
+                                #{photoIdx + 1}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
-                    <div className="space-y-1 my-1">
-                      {selectedVisitor.photos.map((p, idx) => (
-                        <div
-                          key={idx}
-                          style={{ backgroundColor: p.color }}
-                          className="h-9 border border-white/30 flex items-center justify-center text-[8px] font-pixel-title text-white"
-                        >
-                          #{idx + 1}
-                        </div>
-                      ))}
-                    </div>
-                    <div className="text-center font-pixel-title text-[7px] text-[#5CE1E6] border-t border-white/20 pt-1 mt-1.5">
-                      {selectedVisitor.nickname} &bull; {selectedVisitor.number}
-                    </div>
+
+                    {/* Layer Frame Asli PNG Transparan */}
+                    {selectedVisitor.frameImage && (
+                      <img
+                        src={selectedVisitor.frameImage}
+                        alt={selectedVisitor.template}
+                        className="absolute inset-0 w-full h-full object-fill pixel-art pointer-events-none z-10"
+                      />
+                    )}
+
+                    <span className="absolute bottom-1 right-1.5 z-20 text-[7px] font-pixel-title text-[#FFD84D] bg-black/70 px-1 border border-[#FFD84D]/30">
+                      {selectedVisitor.nickname} ({selectedVisitor.number})
+                    </span>
                   </div>
 
                   <div className="md:col-span-2 space-y-3">
@@ -601,35 +850,51 @@ export default function GalleryPage() {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  {selectedVisitor.photos.map((photo) => (
-                    <div
-                      key={photo.id}
-                      className="bg-[#131947]/90 border-2 border-[#4B57B2] p-3 flex items-center justify-between gap-3 shadow-[2px_2px_0_0_#050C38]"
-                    >
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div
-                          style={{ backgroundColor: photo.color }}
-                          className="w-12 h-11 border border-white/30 flex items-center justify-center font-pixel-title text-xs text-white shrink-0"
-                        >
-                          #{photo.id}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="font-pixel-title text-xs text-white truncate">
-                            {photo.label || `Foto ${photo.id}`}
-                          </p>
-                          <p className="text-[10px] text-[#5CE1E6] truncate">1920 x 1280 &bull; 2.4 MB</p>
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => handleDownloadPhoto(photo)}
-                        className="w-10 h-10 pixel-box bg-[#050C38] hover:bg-[#E02F75] text-[#5CE1E6] hover:text-white shrink-0 flex items-center justify-center transition-colors"
-                        title={`Unduh ${photo.label || `Foto ${photo.id}`}`}
+                  {selectedVisitor.photos.map((photo) => {
+                    const isImg =
+                      photo.color.startsWith('data:image') ||
+                      photo.color.startsWith('/') ||
+                      photo.color.startsWith('http');
+                    return (
+                      <div
+                        key={photo.id}
+                        className="bg-[#131947]/90 border-2 border-[#4B57B2] p-3 flex items-center justify-between gap-3 shadow-[2px_2px_0_0_#050C38]"
                       >
-                        <Download className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div
+                            style={{ backgroundColor: isImg ? '#000' : photo.color }}
+                            className="w-12 h-11 border border-white/30 overflow-hidden flex items-center justify-center font-pixel-title text-xs text-white shrink-0"
+                          >
+                            {isImg ? (
+                              <img
+                                src={photo.color}
+                                alt={photo.label}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              `#${photo.id}`
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-pixel-title text-xs text-white truncate">
+                              {photo.label || `Foto ${photo.id}`}
+                            </p>
+                            <p className="text-[10px] text-[#5CE1E6] truncate">
+                              1920 x 1280 &bull; 2.4 MB
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => handleDownloadPhoto(photo)}
+                          className="w-10 h-10 pixel-box bg-[#050C38] hover:bg-[#E02F75] text-[#5CE1E6] hover:text-white shrink-0 flex items-center justify-center transition-colors"
+                          title={`Unduh ${photo.label || `Foto ${photo.id}`}`}
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
