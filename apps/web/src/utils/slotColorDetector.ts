@@ -272,10 +272,29 @@ export async function detectSlotsAndPunchHoles(
           };
         });
 
-        // 5. Lubangi area kotak foto yang terdeteksi menjadi transparan (alpha = 0)
+        // 5. Lubangi HANYA piksel yang cocok dengan warna patokan di dalam slot foto menjadi transparan (alpha = 0)
+        // Dekorasi bingkai (seperti stiker, love, smiley, teks, icon, border) yang menimpa slot tetap utuh & di depan foto!
         for (const slot of finalSlots) {
-          ctx.clearRect(slot.x, slot.y, slot.width, slot.height);
+          const minX = Math.max(0, Math.floor(slot.x));
+          const maxX = Math.min(CANVAS_WIDTH, Math.ceil(slot.x + slot.width));
+          const minY = Math.max(0, Math.floor(slot.y));
+          const maxY = Math.min(CANVAS_HEIGHT, Math.ceil(slot.y + slot.height));
+
+          for (let y = minY; y < maxY; y++) {
+            for (let x = minX; x < maxX; x++) {
+              const idx = (y * CANVAS_WIDTH + x) * 4;
+              const r = data[idx];
+              const g = data[idx + 1];
+              const b = data[idx + 2];
+              const a = data[idx + 3];
+
+              if (a > 0 && isColorMatch(r, g, b, targetRgb)) {
+                data[idx + 3] = 0; // Buat transparan hanya warna patokan lubang foto
+              }
+            }
+          }
         }
+        ctx.putImageData(imgData, 0, 0);
 
         const punchedImageBase64 = canvas.toDataURL('image/png');
 
