@@ -19,6 +19,8 @@ import {
   X,
   RefreshCw,
   Play,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { retroAudio } from '@/utils/audio';
 import {
@@ -42,6 +44,7 @@ import {
 import { PixelCameraViewfinder } from '@/components/pixel/PixelCameraViewfinder';
 import { PixelPhotoStripDispenser } from '@/components/pixel/PixelPhotoStripDispenser';
 import { getAndAdvanceTicketNumber, getCurrentTicketNumber } from '@/utils/ticketSequence';
+import { getDefaultSlots } from '@/utils/photoDownloadHelper';
 
 type BoothStep = 'standby' | 'welcome' | 'choosing_design' | 'countdown' | 'flash' | 'review' | 'result';
 
@@ -437,27 +440,44 @@ export default function BoothKioskPage() {
         if (soundEnabled) retroAudio.playShutterSound();
         setStep('flash');
         setIsFlashActive(true);
-        setTimeout(() => {
+
+        const executeCapture = async () => {
+          let photoData = '';
+
+          // 1. Panggil API Canon ke tablet jika mode Canon aktif
+          if (cameraSource === 'canon') {
+            try {
+              const res = await fetch('/api/canon', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  photoIndex: retakeIndex !== null ? retakeIndex : currentPhotoIdx,
+                  visitorName: visitorName || 'Pengunjung',
+                }),
+              });
+              const json = await res.json();
+              if (json.success && json.photoUrl) {
+                photoData = json.photoUrl;
+              }
+            } catch (err) {
+              console.warn('Gagal memanggil API Canon:', err);
+            }
+          }
+
+          // 2. Fallback ke webcam laptop snapshot atau simulator
+          if (!photoData) {
+            const colors = ['#1D4ED8', '#BE185D', '#047857', '#B45309', '#7C3AED', '#DB2777'];
+            const fallbackColor = colors[currentPhotoIdx % colors.length];
+            photoData = latestWebcamSnapshotRef.current || fallbackColor;
+            latestWebcamSnapshotRef.current = null;
+          }
+
           setIsFlashActive(false);
 
           // 1. KASUS KHUSUS RETAKE SINGLE FOTO (HANYA GANTI 1 FOTO YANG DIULANG)
           if (retakeIndex !== null) {
-            const newPalette = [
-              '#3B82F6', '#EC4899', '#10B981', '#F59E0B',
-              '#8B5CF6', '#EF4444', '#06B6D4', '#E11D48',
-              '#14B8A6', '#F97316', '#6366F1', '#84CC16',
-            ];
-            const oldColor = capturedPhotos[retakeIndex];
-            const pool = newPalette.filter((c) => c !== oldColor);
-            const fallbackColor = pool[Math.floor(Math.random() * pool.length)] || newPalette[0];
-            const photoData =
-              latestWebcamSnapshotRef.current || fallbackColor;
-            latestWebcamSnapshotRef.current = null;
-
             const updated = [...capturedPhotos];
             updated[retakeIndex] = photoData;
-
-            // Pastikan panjang array tetap pas sejumlah template photoCount
             setCapturedPhotos(updated.slice(0, selectedTemplate.photoCount));
             setRetakeIndex(null);
             setStep('review');
@@ -466,12 +486,6 @@ export default function BoothKioskPage() {
           }
 
           // 2. KASUS NORMAL (JEPRET BERURUTAN DARI 0 SAMPAI photoCount)
-          const colors = ['#1D4ED8', '#BE185D', '#047857', '#B45309', '#7C3AED', '#DB2777'];
-          const fallbackColor = colors[currentPhotoIdx % colors.length];
-          const photoData =
-            latestWebcamSnapshotRef.current || fallbackColor;
-          latestWebcamSnapshotRef.current = null;
-
           const newPhotos = [...capturedPhotos, photoData];
           setCapturedPhotos(newPhotos.slice(0, selectedTemplate.photoCount));
 
@@ -483,11 +497,15 @@ export default function BoothKioskPage() {
             setStep('review');
             if (soundEnabled) retroAudio.playSuccessChime();
           }
+        };
+
+        setTimeout(() => {
+          executeCapture().catch(console.error);
         }, 360);
       }
     }
     return () => clearTimeout(timer);
-  }, [step, countdownNum, currentPhotoIdx, capturedPhotos, selectedTemplate.photoCount, soundEnabled, retakeIndex, cameraSource, webcamStatus]);
+  }, [step, countdownNum, currentPhotoIdx, capturedPhotos, selectedTemplate.photoCount, soundEnabled, retakeIndex, cameraSource, webcamStatus, visitorName]);
 
   const startCapture = () => {
     if (soundEnabled) retroAudio.playButtonClick();
@@ -600,6 +618,84 @@ export default function BoothKioskPage() {
           </div>
         );
     }
+  };
+
+  // Preview Besar Penuh 4R (Model Geser & Tampak Keseluruhan)
+  const renderTemplateLargePreview = (tpl: TemplateOption) => {
+    const slots =
+      tpl.slots && tpl.slots.length > 0
+        ? tpl.slots
+        : getDefaultSlots(tpl.photoCount || 4, 1200, 1800);
+
+    return (
+      <div className="relative w-64 sm:w-72 md:w-80 aspect-[2/3] bg-gradient-to-b from-[#0C1230] to-[#160078] border-4 border-[#35408E] shadow-[0_0_24px_rgba(224,47,117,0.4)] overflow-hidden flex items-center justify-center shrink-0">
+        {/* Layer Posisi Slot Foto (Tampak Keseluruhan) */}
+        <div className="absolute inset-0 pointer-events-none">
+          {slots.map((s, idx) => {
+            const leftPct = (s.x / 1200) * 100;
+            const topPct = (s.y / 1800) * 100;
+            const widthPct = (s.width / 1200) * 100;
+            const heightPct = (s.height / 1800) * 100;
+            const poseNum =
+              (s.photo !== undefined
+                ? s.photo
+                : s.source_index !== undefined
+                ? s.source_index
+                : idx) + 1;
+
+            return (
+              <div
+                key={idx}
+                style={{
+                  position: 'absolute',
+                  left: `${leftPct}%`,
+                  top: `${topPct}%`,
+                  width: `${widthPct}%`,
+                  height: `${heightPct}%`,
+                }}
+                className="bg-black/80 border border-[#FE0168]/70 flex flex-col items-center justify-center text-[#FFD84D] font-pixel-title"
+              >
+                <span className="text-[10px] sm:text-xs font-bold text-[#FFD84D] drop-shadow">
+                  POSE #{poseNum}
+                </span>
+                <span className="text-[7px] text-white/60 font-mono">
+                  SLOT {idx + 1}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Layer Frame Asli Transparan PNG */}
+        {tpl.frameImage && (
+          <img
+            src={tpl.frameImage}
+            alt={tpl.name}
+            className="absolute inset-0 w-full h-full object-fill pixel-art pointer-events-none z-10"
+          />
+        )}
+
+        {/* Badge 4R */}
+        <span className="absolute bottom-1 right-1.5 z-20 text-[7px] font-pixel-title text-[#FFD84D] bg-black/80 px-1 border border-[#FFD84D]/40">
+          CETAK 4R (1200×1800)
+        </span>
+      </div>
+    );
+  };
+
+  const currentTemplateIdx = templates.findIndex((t) => t.slug === selectedTemplate.slug);
+  const safeTemplateIdx = currentTemplateIdx >= 0 ? currentTemplateIdx : 0;
+
+  const handlePrevTemplate = () => {
+    if (soundEnabled) retroAudio.playButtonClick();
+    const prevIdx = (safeTemplateIdx - 1 + templates.length) % templates.length;
+    setSelectedTemplate(templates[prevIdx]);
+  };
+
+  const handleNextTemplate = () => {
+    if (soundEnabled) retroAudio.playButtonClick();
+    const nextIdx = (safeTemplateIdx + 1) % templates.length;
+    setSelectedTemplate(templates[nextIdx]);
   };
 
   // Cegah hydration mismatch sebelum client ter-mount
@@ -941,64 +1037,156 @@ export default function BoothKioskPage() {
         )}
 
         {/* ===================================================================
-            STEP 2: PILIH DESAIN BINGKAI
+            STEP 2: PILIH DESAIN BINGKAI (MODEL GESER & BESAR TAMPAK KESELURUHAN)
             =================================================================== */}
         {step === 'choosing_design' && (
-          <div className="w-full animate-fadeIn bg-[#0C1230]/90 pixel-box p-6 sm:p-8 backdrop-blur text-center">
-            <h2 className="font-pixel-title text-base sm:text-lg text-[#FFD84D] mb-1">
-              PILIH DESAIN BINGKAI FOTO 4R
-            </h2>
-            <p className="text-xs text-[#A9B8FF] mb-6">
-              Pilih tata letak bingkai cetak favoritmu (kompatibel kertas foto 4R 1200x1800).
+          <div className="w-full max-w-4xl mx-auto animate-fadeIn bg-[#0C1230]/95 pixel-box p-4 sm:p-6 backdrop-blur text-center shadow-[0_0_30px_rgba(5,12,56,0.9)]">
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <Sparkles className="w-4 h-4 text-[#FFD84D]" />
+              <h2 className="font-pixel-title text-base sm:text-lg text-[#FFD84D]">
+                PILIH DESAIN BINGKAI FOTO 4R
+              </h2>
+              <Sparkles className="w-4 h-4 text-[#FFD84D]" />
+            </div>
+            <p className="text-xs text-[#A9B8FF] mb-4">
+              Geser tombol kiri &bull; kanan untuk melihat tampilan keseluruhan bingkai cetak 4R (1200×1800 px).
             </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-6 max-h-[58vh] overflow-y-auto pr-1">
-              {templates.map((tpl) => (
+            {/* PANGGUNG UTAMA: PREVIEW BESAR PROPORSI 4R DENGAN TOMBOL GESER */}
+            <div className="flex flex-col md:flex-row items-center justify-center gap-6 my-2">
+              {/* Sisi Kiri: Preview Besar & Tombol Panah Geser Kiri-Kanan */}
+              <div className="flex items-center justify-center gap-2 sm:gap-4">
                 <button
-                  key={tpl.slug}
-                  onClick={() => {
-                    if (soundEnabled) retroAudio.playButtonClick();
-                    setSelectedTemplate(tpl);
-                  }}
-                  className={`p-3 text-left border-4 transition-all flex items-start gap-3 pixel-art relative ${
-                    selectedTemplate.slug === tpl.slug
-                      ? 'border-[#E02F75] bg-[#6700A3]/60 shadow-[0_0_12px_#E02F75]'
-                      : 'border-[#4B57B2] bg-[#131947]/70 hover:border-white/50'
-                  }`}
+                  type="button"
+                  onClick={handlePrevTemplate}
+                  className="w-10 h-16 sm:w-12 sm:h-28 bg-[#131947] hover:bg-[#FE0168] border-2 border-[#5CE1E6] text-[#FFD84D] hover:text-white flex items-center justify-center active:scale-95 transition-all shadow-[3px_3px_0_0_#050C38]"
+                  title="Desain Sebelumnya"
                 >
-                  <div className="flex-shrink-0">
-                    {renderTemplateMiniPreview(tpl)}
+                  <ChevronLeft className="w-6 h-6 sm:w-8 sm:h-8" />
+                </button>
+
+                {/* Bingkai Besar Proporsional 4R Tampak Keseluruhan */}
+                <div className="relative">
+                  {renderTemplateLargePreview(selectedTemplate)}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleNextTemplate}
+                  className="w-10 h-16 sm:w-12 sm:h-28 bg-[#131947] hover:bg-[#FE0168] text-[#FFD84D] hover:text-white border-2 border-[#5CE1E6] flex items-center justify-center active:scale-95 transition-all shadow-[3px_3px_0_0_#050C38]"
+                  title="Desain Berikutnya"
+                >
+                  <ChevronRight className="w-6 h-6 sm:w-8 sm:h-8" />
+                </button>
+              </div>
+
+              {/* Sisi Kanan: Detail Template & Aksi */}
+              <div className="flex-1 max-w-sm text-left flex flex-col justify-between self-stretch bg-[#050C38]/85 border-2 border-[#4B57B2] p-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <span className="font-pixel-title text-sm sm:text-base text-[#FFD84D] tracking-wide">
+                      {selectedTemplate.name}
+                    </span>
+                    {selectedTemplate.isCustom && (
+                      <span className="text-[8px] font-pixel-title bg-[#E02F75] px-1.5 py-0.5 text-white border border-[#FFD84D]">
+                        CUSTOM 4R
+                      </span>
+                    )}
                   </div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1 gap-1">
-                      <span className="font-pixel-title text-[11px] text-[#FFD84D] leading-tight truncate">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-[9px] font-pixel-title bg-[#160078] px-2 py-0.5 text-[#00E599] border border-[#00E599]/40">
+                      {selectedTemplate.photoCount}X JEPRET
+                    </span>
+                    <span className="text-[9px] font-pixel-title bg-[#131947] px-2 py-0.5 text-[#5CE1E6] border border-[#5CE1E6]/40">
+                      {(selectedTemplate.slots?.length || 4)} SLOT CETAK
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-[#A9B8FF] leading-relaxed mb-4 font-sans">
+                    {selectedTemplate.desc}
+                  </p>
+                </div>
+
+                <div>
+                  {/* Indikator Titik Geser */}
+                  <div className="flex items-center justify-center gap-2 mb-4">
+                    {templates.map((tpl, i) => (
+                      <button
+                        key={tpl.slug}
+                        type="button"
+                        onClick={() => setSelectedTemplate(tpl)}
+                        className={`transition-all ${
+                          selectedTemplate.slug === tpl.slug
+                            ? 'w-6 h-2 bg-[#FFD84D] border border-white'
+                            : 'w-2 h-2 bg-white/30 hover:bg-white/60'
+                        }`}
+                        title={tpl.name}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Tombol Utama Konfirmasi & Mulai Foto */}
+                  <button
+                    type="button"
+                    onClick={startCapture}
+                    className="w-full h-14 pixel-btn bg-[#049A5C] hover:bg-[#00E599] text-white text-xs sm:text-sm font-pixel-title font-bold flex items-center justify-center gap-2 shadow-[4px_4px_0_0_#050C38] active:scale-95"
+                  >
+                    <Camera className="w-5 h-5 text-[#FFD84D]" />
+                    <span>PILIH DESAIN INI &bull; MULAI ({selectedTemplate.photoCount}X)</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* FILMSTRIP CAROUSEL MINI HORIZONTAL DI BAWAH (MODEL GESER CEPAT) */}
+            <div className="mt-4 pt-3 border-t-2 border-[#1E2768]">
+              <div className="flex items-center justify-between mb-2 px-1">
+                <span className="text-[9px] font-pixel-title text-[#A9B8FF]">
+                  PILIHAN SEMUA BINGKAI ({templates.length} DESAIN &bull; GESER HORIZONTAL):
+                </span>
+                <span className="text-[9px] font-pixel-title text-[#FFD84D]">
+                  {safeTemplateIdx + 1} / {templates.length}
+                </span>
+              </div>
+              <div className="flex items-center gap-2.5 overflow-x-auto pb-2 scrollbar-thin">
+                {templates.map((tpl) => (
+                  <button
+                    key={tpl.slug}
+                    type="button"
+                    onClick={() => {
+                      if (soundEnabled) retroAudio.playButtonClick();
+                      setSelectedTemplate(tpl);
+                    }}
+                    className={`flex items-center gap-2 p-2 border-2 text-left shrink-0 transition-all ${
+                      selectedTemplate.slug === tpl.slug
+                        ? 'border-[#00E599] bg-[#160078] shadow-[0_0_8px_#00E599]'
+                        : 'border-[#4B57B2]/70 bg-[#050C38] hover:border-white/50'
+                    }`}
+                  >
+                    {renderTemplateMiniPreview(tpl)}
+                    <div className="min-w-0 pr-1">
+                      <span className="font-pixel-title text-[9px] text-[#FFD84D] block truncate max-w-[120px]">
                         {tpl.name}
                       </span>
-                      {tpl.isCustom && (
-                        <span className="text-[7px] font-pixel-title bg-[#E02F75] px-1 py-0.5 text-white border border-[#FFD84D] shrink-0">
-                          CUSTOM
-                        </span>
-                      )}
+                      <span className="text-[8px] text-[#A9B8FF] block">
+                        {tpl.photoCount} Foto
+                      </span>
                     </div>
-                    <span className="text-[9px] font-pixel-title bg-black/60 px-1.5 py-0.5 text-[#5CE1E6] border border-white/20 inline-block mb-1">
-                      {tpl.photoCount}X JEPRET
-                    </span>
-                    <p className="text-[11px] text-white/70 leading-snug line-clamp-2">{tpl.desc}</p>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Banner Peringatan Akses Kamera Laptop Jika Ditolak/Belum Aktif */}
             {cameraSource === 'webcam' && webcamStatus === 'error' && (
-              <div className="w-full max-w-xl mx-auto mb-4 p-3.5 bg-[#FE0168]/20 border-2 border-[#FE0168] text-white text-xs font-pixel-title flex flex-col sm:flex-row items-center justify-between gap-3 text-left">
+              <div className="w-full max-w-xl mx-auto my-3 p-3 bg-[#FE0168]/20 border-2 border-[#FE0168] text-white text-xs font-pixel-title flex flex-col sm:flex-row items-center justify-between gap-3 text-left">
                 <div className="flex items-start gap-2.5">
                   <AlertTriangle className="w-4 h-4 text-[#FFD84D] shrink-0 mt-0.5" />
                   <div>
                     <span className="text-[#FFD84D] block font-bold mb-0.5">KAMERA LAPTOP BUTUH AKSES:</span>
                     <span className="text-[11px] font-normal font-sans text-white/90 leading-tight block">
-                      {webcamErrorMsg || 'Klik ikon gembok di sebelah kiri localhost:3000 -> Izinkan Kamera.'}
+                      {webcamErrorMsg || 'Klik ikon gembok di browser -> Izinkan Kamera.'}
                     </span>
                   </div>
                 </div>
@@ -1012,21 +1200,13 @@ export default function BoothKioskPage() {
               </div>
             )}
 
-            <button
-              onClick={startCapture}
-              className="h-14 px-8 pixel-btn bg-[#049A5C] hover:bg-[#00E599] text-white text-xs font-bold flex items-center justify-center gap-2 mx-auto"
-            >
-              <Camera className="w-4 h-4" />
-              <span>MULAI SESI FOTO ({selectedTemplate.photoCount}X JEPRET)</span>
-            </button>
-
             {/* Indikator Sumber Kamera Aktif */}
             <div className="mt-3 flex items-center justify-center gap-2 text-[10px] text-[#A9B8FF] font-pixel-title">
               <span>SUMBER KAMERA:</span>
               <span className={cameraSource === 'webcam' ? 'text-[#5CE1E6]' : 'text-[#00E599]'}>
                 {cameraSource === 'webcam'
                   ? `KAMERA LAPTOP ${webcamStatus === 'connected' ? '● SIAP' : webcamStatus === 'error' ? '● BUTUH IZIN' : '● MEMERIKSA'}`
-                  : 'CANON EOS 1200D DSLR ● SIAP'}
+                  : 'CANON EOS 1200D DSLR (API AKTIF) ● SIAP'}
               </span>
               <button
                 type="button"
@@ -1364,18 +1544,56 @@ export default function BoothKioskPage() {
                   <Camera className="w-6 h-6" />
                 </div>
                 <h4 className="font-pixel-title text-xs text-[#00E599] mb-1">
-                  KAMERA CANON EOS 1200D AKTIF
+                  KAMERA CANON EOS 1200D (API LANGSUNG KE TABLET)
                 </h4>
-                <p className="text-[11px] text-white/80 max-w-sm mx-auto mb-4 font-sans leading-relaxed">
-                  Bilik foto terhubung langsung ke kamera Canon DSLR via driver backend server. Foto akan diambil menggunakan sensor Canon saat sesi berlangsung.
+                <p className="text-[11px] text-white/80 max-w-sm mx-auto mb-3 font-sans leading-relaxed">
+                  Tablet terhubung ke API Canon DSLR. Tekan tombol uji di bawah untuk memicu rana kamera Canon dan melihat hasil jepretan uji coba.
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setIsWebcamModalOpen(false)}
-                  className="w-full py-2.5 pixel-btn bg-[#00E599] hover:bg-[#5CE1E6] text-[#050C38] text-xs font-pixel-title font-bold active:scale-95"
-                >
-                  SELESAI & GUNAKAN CANON
-                </button>
+
+                {/* Pratinjau Snapshot Uji Coba Canon jika ada */}
+                {testSnapshotUrl && (
+                  <div className="w-52 aspect-[4/3] mx-auto border-2 border-[#FFD84D] mb-4 bg-black overflow-hidden shadow-lg relative">
+                    <img src={testSnapshotUrl} alt="Hasil Snapshot Canon" className="w-full h-full object-cover" />
+                    <span className="absolute bottom-1 right-1 bg-black/80 text-[#00E599] text-[8px] font-pixel-title px-1 border border-[#00E599]/40">
+                      HASIL UJI CANON
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (soundEnabled) retroAudio.playShutterSound();
+                      try {
+                        const res = await fetch('/api/canon', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ isTest: true, photoIndex: 0, visitorName: 'Uji Coba Tablet' }),
+                        });
+                        const json = await res.json();
+                        if (json.success && json.photoUrl) {
+                          setTestSnapshotUrl(json.photoUrl);
+                          if (soundEnabled) retroAudio.playSuccessChime();
+                        }
+                      } catch {
+                        alert('Gagal menguji API Canon');
+                      }
+                    }}
+                    className="flex-1 py-2.5 pixel-btn bg-[#FFD84D] hover:bg-[#FFE57F] text-[#050C38] text-xs font-pixel-title font-bold flex items-center justify-center gap-1.5 active:scale-95 shadow"
+                  >
+                    <Camera className="w-4 h-4 text-[#050C38]" />
+                    <span>📸 TES JEPRET CANON API</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsWebcamModalOpen(false)}
+                    className="px-4 py-2.5 pixel-btn bg-[#00E599] hover:bg-[#5CE1E6] text-[#050C38] text-xs font-pixel-title font-bold active:scale-95"
+                  >
+                    GUNAKAN CANON
+                  </button>
+                </div>
               </div>
             )}
           </div>
