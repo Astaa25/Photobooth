@@ -206,7 +206,7 @@ export function PixelPhotoStripDispenser({
                 <img
                   src={frameImage}
                   alt={templateName}
-                  className="absolute inset-0 w-full h-full object-fill pixel-art pointer-events-none z-10"
+                  className="absolute inset-0 w-full h-full object-contain pixel-art pointer-events-none z-10"
                 />
               )}
 

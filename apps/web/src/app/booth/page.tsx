@@ -134,6 +134,41 @@ export default function BoothKioskPage() {
   const [selectedWebcamId, setSelectedWebcamId] = useState<string>('');
   const testVideoRef = useRef<HTMLVideoElement | null>(null);
   const carouselRef = useRef<HTMLDivElement | null>(null);
+  const [dynamicCardWidth, setDynamicCardWidth] = useState<number>(360);
+  const [previewDims, setPreviewDims] = useState<{ width: number; height: number }>({ width: 336, height: 504 });
+
+  // Hitung dimensi kartu & preview agar presisi proporsional 4R (1200x1800) tanpa gepeng di segala resolusi layar
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const updateCardDimensions = () => {
+      const container = carouselRef.current;
+      const reelHeight = container && container.clientHeight > 0 ? container.clientHeight : (window.innerHeight - 200);
+      // Non-preview height di dalam kartu: padding (16px), bar atas kartu (32px), bar info judul (24px), tombol aksi (38px), margin (14px) = ~124px
+      const availablePreviewHeight = Math.max(160, reelHeight - 124);
+      // Rasio asli 4R: 1200 / 1800 = 2 / 3
+      const naturalWidth = Math.round(availablePreviewHeight * (2 / 3));
+      const naturalHeight = Math.round(naturalWidth * 1.5);
+      const targetCardWidth = naturalWidth + 24; // 12px padding kiri + 12px kanan
+
+      setPreviewDims({ width: naturalWidth, height: naturalHeight });
+      setDynamicCardWidth(targetCardWidth);
+    };
+
+    updateCardDimensions();
+
+    let observer: ResizeObserver | null = null;
+    if (carouselRef.current && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(updateCardDimensions);
+      observer.observe(carouselRef.current);
+    }
+
+    window.addEventListener('resize', updateCardDimensions);
+    return () => {
+      if (observer) observer.disconnect();
+      window.removeEventListener('resize', updateCardDimensions);
+    };
+  }, [step]);
 
   // Periksa apakah tablet sudah diaktifkan di sesi browser ini & kunci scroll window agar pas 1 layar
   useEffect(() => {
@@ -1114,7 +1149,7 @@ export default function BoothKioskPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    if (carouselRef.current) carouselRef.current.scrollBy({ left: -260, behavior: 'smooth' });
+                    if (carouselRef.current) carouselRef.current.scrollBy({ left: -(dynamicCardWidth + 14), behavior: 'smooth' });
                     handlePrevTemplate();
                   }}
                   className="px-2.5 py-1 pixel-btn bg-[#160078] hover:bg-[#FE0168] text-[#FFD84D] hover:text-white text-[10px] sm:text-xs font-pixel-title flex items-center gap-1 shadow-[2px_2px_0_0_#050C38] active:scale-95"
@@ -1123,14 +1158,14 @@ export default function BoothKioskPage() {
                   <span>KIRI</span>
                 </button>
 
-                <div className="px-2.5 py-0.5 bg-[#050C38] border border-[#FFD84D]/60 font-pixel-title text-[10px] sm:text-xs text-[#FFD84D] truncate max-w-[200px]">
+                <div className="px-3 py-0.5 bg-[#050C38] border border-[#FFD84D]/60 font-pixel-title text-[10px] sm:text-xs text-[#FFD84D] truncate max-w-[240px] sm:max-w-[360px]">
                   | {safeTemplateIdx + 1} / {templates.length} | &bull; <span className="text-white">{selectedTemplate.name}</span>
                 </div>
 
                 <button
                   type="button"
                   onClick={() => {
-                    if (carouselRef.current) carouselRef.current.scrollBy({ left: 260, behavior: 'smooth' });
+                    if (carouselRef.current) carouselRef.current.scrollBy({ left: (dynamicCardWidth + 14), behavior: 'smooth' });
                     handleNextTemplate();
                   }}
                   className="px-2.5 py-1 pixel-btn bg-[#160078] hover:bg-[#FE0168] text-[#FFD84D] hover:text-white text-[10px] sm:text-xs font-pixel-title flex items-center gap-1 shadow-[2px_2px_0_0_#050C38] active:scale-95"
@@ -1144,7 +1179,7 @@ export default function BoothKioskPage() {
             {/* REEL TRACK HORIZONTAL DINAMIS: HANYA GESER KE SAMPING, 100% PAS 1 LAYAR TANPA SCROLL VERTIKAL */}
             <div
               ref={carouselRef}
-              className="flex-1 min-h-0 flex gap-2.5 sm:gap-3.5 overflow-x-auto overflow-y-hidden snap-x snap-mandatory py-1 px-1.5 scroll-smooth scrollbar-thin items-stretch w-full"
+              className="flex-1 min-h-0 flex gap-3 sm:gap-4 overflow-x-auto overflow-y-hidden snap-x snap-mandatory py-1 px-2 scroll-smooth scrollbar-thin items-stretch w-full"
             >
               {templates.map((tpl, idx) => {
                 const isSelected = selectedTemplate.slug === tpl.slug;
@@ -1162,32 +1197,40 @@ export default function BoothKioskPage() {
                         if (soundEnabled) retroAudio.playButtonClick();
                       }
                     }}
-                    className={`h-full max-h-full flex flex-col justify-between shrink-0 snap-center w-[170px] sm:w-[195px] md:w-[220px] pixel-box p-1.5 cursor-pointer transition-all text-left overflow-hidden ${
+                    style={{ width: `${dynamicCardWidth}px` }}
+                    className={`h-full max-h-full flex flex-col justify-between shrink-0 snap-center pixel-box p-2 cursor-pointer transition-all text-left overflow-hidden ${
                       isSelected
-                        ? 'border-4 border-[#00E599] bg-[#131947] shadow-[0_0_18px_rgba(0,229,153,0.7),3px_3px_0_0_#050C38] ring-2 ring-[#00E599]/50 scale-[1.01]'
+                        ? 'border-4 border-[#00E599] bg-[#131947] shadow-[0_0_24px_rgba(0,229,153,0.7),3px_3px_0_0_#050C38] ring-2 ring-[#00E599]/50 scale-[1.01]'
                         : 'border-2 border-[#4B57B2] bg-[#0C1230]/90 hover:border-[#5CE1E6] hover:bg-[#131947]/80 opacity-90 hover:opacity-100'
                     }`}
                   >
                     {/* Header Nomor Kartu: | 1 | | 2 | | 3 | */}
-                    <div className="flex items-center justify-between pb-0.5 border-b border-white/10 shrink-0">
-                      <div className="flex items-center gap-1">
-                        <span className="font-pixel-title text-xs sm:text-sm text-[#FFD84D] px-1.5 py-0.5 bg-[#050C38] border border-[#FFD84D]/70 shadow-[1px_1px_0_0_#050C38]">
+                    <div className="flex items-center justify-between pb-1 border-b border-white/10 shrink-0">
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="font-pixel-title text-xs sm:text-sm text-[#FFD84D] px-2 py-0.5 bg-[#050C38] border border-[#FFD84D]/70 shadow-[1px_1px_0_0_#050C38] whitespace-nowrap">
                           | {idx + 1} |
                         </span>
                         {tpl.isCustom && (
-                          <span className="text-[7px] font-pixel-title bg-[#E02F75] px-1 py-0.5 text-white border border-[#FFD84D]">
+                          <span className="text-[7px] font-pixel-title bg-[#E02F75] px-1 py-0.5 text-white border border-[#FFD84D] whitespace-nowrap">
                             CUSTOM
                           </span>
                         )}
                       </div>
-                      <span className="text-[9px] font-pixel-title text-[#00E599] bg-[#160078] px-1.5 py-0.5 border border-[#00E599]/40">
+                      <span className="text-[9px] sm:text-[10px] font-pixel-title text-[#00E599] bg-[#160078] px-2 py-0.5 border border-[#00E599]/40 whitespace-nowrap">
                         {tpl.photoCount}X FOTO
                       </span>
                     </div>
 
-                    {/* Lembar Preview Proporsional 4R Penuh (Tinggi secara otomatis mengisi sisa ruang 1 layar penuh) */}
-                    <div className="flex-1 min-h-0 flex items-center justify-center my-0.5 w-full overflow-hidden">
-                      <div className="h-full max-h-full aspect-[2/3] relative bg-gradient-to-b from-[#0C1230] to-[#160078] border border-[#35408E] overflow-hidden shadow-[0_0_8px_rgba(0,0,0,0.6)]">
+                    {/* Lembar Preview Proporsional 4R Penuh (TIDAK GEPENG: RASIO 2:3 ASLI 1200x1800) */}
+                    <div className="flex-1 min-h-0 flex items-center justify-center my-1 w-full overflow-hidden">
+                      <div
+                        style={{
+                          width: `${previewDims.width}px`,
+                          height: `${previewDims.height}px`,
+                          aspectRatio: '1200 / 1800',
+                        }}
+                        className="relative bg-gradient-to-b from-[#0C1230] to-[#160078] border-2 border-[#35408E] overflow-hidden shadow-[0_0_12px_rgba(0,0,0,0.8)] mx-auto shrink-0 select-none"
+                      >
                         {/* Layer Slot Foto & Posisi Pose */}
                         <div className="absolute inset-0 pointer-events-none">
                           {slots.map((s, sIdx) => {
@@ -1214,7 +1257,7 @@ export default function BoothKioskPage() {
                                 }}
                                 className="bg-black/85 border border-[#FE0168]/70 flex flex-col items-center justify-center text-[#FFD84D] font-pixel-title"
                               >
-                                <span className="text-[8px] sm:text-[9px] font-bold text-[#FFD84D] drop-shadow">
+                                <span className="text-[9px] sm:text-[10px] font-bold text-[#FFD84D] drop-shadow">
                                   #{poseNum}
                                 </span>
                               </div>
@@ -1222,29 +1265,29 @@ export default function BoothKioskPage() {
                           })}
                         </div>
 
-                        {/* Layer Frame Asli PNG Transparan */}
+                        {/* Layer Frame Asli PNG Transparan (object-contain agar TIDAK GEPENG) */}
                         {tpl.frameImage && (
                           <img
                             src={tpl.frameImage}
                             alt={tpl.name}
-                            className="absolute inset-0 w-full h-full object-fill pixel-art pointer-events-none z-10"
+                            className="absolute inset-0 w-full h-full object-contain pixel-art pointer-events-none z-10"
                           />
                         )}
 
                         {/* Badge 4R */}
-                        <span className="absolute bottom-1 right-1 z-20 text-[6px] font-pixel-title text-[#FFD84D] bg-black/80 px-1 border border-[#FFD84D]/40">
-                          4R
+                        <span className="absolute bottom-1 right-1 z-20 text-[6px] sm:text-[7px] font-pixel-title text-[#FFD84D] bg-black/80 px-1 border border-[#FFD84D]/40">
+                          4R (1200×1800)
                         </span>
                       </div>
                     </div>
 
                     {/* Informasi Ringkas Template */}
-                    <div className="mb-1 shrink-0">
-                      <div className="flex items-center justify-between gap-1">
-                        <h3 className="font-pixel-title text-[10px] text-[#FFD84D] truncate">
+                    <div className="my-1 shrink-0">
+                      <div className="flex items-center justify-between gap-1.5">
+                        <h3 className="font-pixel-title text-xs text-[#FFD84D] truncate font-bold">
                           {tpl.name}
                         </h3>
-                        <span className="text-[7px] font-pixel-title text-[#5CE1E6] bg-[#050C38] px-1 border border-[#5CE1E6]/40 shrink-0">
+                        <span className="text-[8px] font-pixel-title text-[#5CE1E6] bg-[#050C38] px-1.5 py-0.5 border border-[#5CE1E6]/40 shrink-0">
                           {slots.length} SLOT
                         </span>
                       </div>
@@ -1259,10 +1302,10 @@ export default function BoothKioskPage() {
                             e.stopPropagation();
                             startCapture();
                           }}
-                          className="w-full h-7 sm:h-8 pixel-btn bg-[#049A5C] hover:bg-[#00E599] text-white text-[10px] font-pixel-title font-bold flex items-center justify-center gap-1 shadow-[2px_2px_0_0_#050C38] active:scale-95"
+                          className="w-full h-8 sm:h-9 pixel-btn bg-[#049A5C] hover:bg-[#00E599] text-white text-[11px] sm:text-xs font-pixel-title font-bold flex items-center justify-center gap-1.5 shadow-[2px_2px_0_0_#050C38] active:scale-95"
                         >
-                          <Camera className="w-3 h-3 text-[#FFD84D]" />
-                          <span>MULAI ({tpl.photoCount}X)</span>
+                          <Camera className="w-3.5 h-3.5 text-[#FFD84D]" />
+                          <span>MULAI FOTO ({tpl.photoCount}X)</span>
                         </button>
                       ) : (
                         <button
@@ -1272,7 +1315,7 @@ export default function BoothKioskPage() {
                             setSelectedTemplate(tpl);
                             if (soundEnabled) retroAudio.playButtonClick();
                           }}
-                          className="w-full h-7 sm:h-8 pixel-btn bg-[#160078] hover:bg-[#1E2768] text-[#5CE1E6] hover:text-white text-[10px] font-pixel-title flex items-center justify-center gap-1 border border-[#5CE1E6]/40 active:scale-95"
+                          className="w-full h-8 sm:h-9 pixel-btn bg-[#160078] hover:bg-[#1E2768] text-[#5CE1E6] hover:text-white text-[11px] sm:text-xs font-pixel-title flex items-center justify-center gap-1 border border-[#5CE1E6]/40 active:scale-95"
                         >
                           <span>PILIH | {idx + 1} |</span>
                         </button>
