@@ -1,22 +1,31 @@
 {
-  "name": "Photobooth TIK — Kiosk Booth App",
-  "short_name": "Booth App",
-  "description": "Aplikasi Photobooth Kios Layar Penuh Expo Wisuda Jurusan TIK 2026",
+  "name": "TIK Photobooth 2026 — Bilik Foto",
+  "short_name": "Photobooth",
+  "description": "Aplikasi Photobooth Layar Penuh Kiosk Expo Wisuda TIK 2026",
   "start_url": "/booth",
+  "scope": "/",
+  "id": "/booth",
   "display": "standalone",
   "orientation": "landscape",
-  "background_color": "#010030",
+  "background_color": "#050C38",
   "theme_color": "#050C38",
+  "categories": ["photo", "entertainment", "productivity"],
   "icons": [
     {
-      "src": "/assets/pixel/favicon.png",
+      "src": "/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/assets/pixel/favicon.png",
+      "src": "/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

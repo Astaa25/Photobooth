@@ -25,6 +25,7 @@ import {
   Tablet,
   Wifi,
   Usb,
+  Download,
 } from 'lucide-react';
 import { retroAudio } from '@/utils/audio';
 import {
@@ -186,6 +187,9 @@ export default function BoothKioskPage() {
   const [tabletUsbStatus, setTabletUsbStatus] = useState<{ connected: boolean; deviceName?: string; error?: string } | null>(null);
   const [activeCanonTab, setActiveCanonTab] = useState<'wireless-tablet' | 'usb-otg' | 'laptop-host'>('wireless-tablet');
   const [isCopiedUrl, setIsCopiedUrl] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isStandaloneApp, setIsStandaloneApp] = useState(false);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
   const testVideoRef = useRef<HTMLVideoElement | null>(null);
   const carouselRef = useRef<HTMLDivElement | null>(null);
   const [dynamicCardWidth, setDynamicCardWidth] = useState<number>(360);
@@ -223,6 +227,49 @@ export default function BoothKioskPage() {
       window.removeEventListener('resize', updateCardDimensions);
     };
   }, [step]);
+
+  // Deteksi status PWA / WebAPK & listener event install Android
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const isStandalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as any).standalone === true;
+    setIsStandaloneApp(isStandalone);
+
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    const handleAppInstalled = () => {
+      setIsStandaloneApp(true);
+      setDeferredPrompt(null);
+      if (soundEnabled) retroAudio.playSuccessChime();
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, [soundEnabled]);
+
+  const handleInstallApk = async () => {
+    if (soundEnabled) retroAudio.playButtonClick();
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const choice = await deferredPrompt.userChoice;
+      if (choice && choice.outcome === 'accepted') {
+        setIsStandaloneApp(true);
+      }
+      setDeferredPrompt(null);
+    } else {
+      setIsInstallModalOpen(true);
+    }
+  };
 
   // Periksa apakah tablet sudah diaktifkan di sesi browser ini & kunci scroll window agar pas 1 layar
   useEffect(() => {
@@ -1160,6 +1207,21 @@ export default function BoothKioskPage() {
                 {webcamStatus === 'connected' ? '●' : '○'}
               </span>
             </button>
+
+            {/* Tombol Download / Pasang APK di Tablet */}
+            <button
+              type="button"
+              onClick={handleInstallApk}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 border-2 text-[10px] font-pixel-title transition-all active:scale-95 shadow-sm ${
+                isStandaloneApp
+                  ? 'bg-[#00E599]/20 border-[#00E599] text-[#00E599]'
+                  : 'bg-[#FE0168] hover:bg-[#E02F75] border-[#FFD84D] text-white animate-pulse'
+              }`}
+              title="Download & Pasang APK Aplikasi Booth di Tablet Android"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>{isStandaloneApp ? 'APK AKTIF ✓' : '📲 PASANG APK'}</span>
+            </button>
           </div>
 
           <button
@@ -2060,6 +2122,80 @@ export default function BoothKioskPage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Panduan Pasang / Download APK di Tablet */}
+      {isInstallModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#050C38] border-2 border-[#FFD84D] w-full max-w-lg p-5 shadow-2xl relative pixel-box">
+            <button
+              type="button"
+              onClick={() => setIsInstallModalOpen(false)}
+              className="absolute top-3 right-3 text-[#FFD84D] hover:text-white p-1"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3 mb-4 border-b border-[#4B57B2] pb-3">
+              <div className="w-12 h-12 bg-[#FE0168]/20 border border-[#FE0168] text-[#FE0168] flex items-center justify-center shrink-0">
+                <Tablet className="w-6 h-6 text-[#FFD84D]" />
+              </div>
+              <div>
+                <h3 className="font-pixel-title text-sm text-[#FFD84D]">
+                  PASANG / DOWNLOAD APK DI TABLET
+                </h3>
+                <p className="text-[11px] text-[#A9B8FF] font-sans">
+                  Aplikasi Kiosk Layar Penuh Resmi untuk Tablet Android
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3 text-xs font-sans text-white/90 mb-5">
+              <div className="p-3 bg-[#0C1230] border border-[#00E599]/60 flex items-start gap-2.5">
+                <span className="w-6 h-6 bg-[#00E599] text-[#050C38] font-pixel-title font-bold text-xs flex items-center justify-center shrink-0">1</span>
+                <div>
+                  <p className="font-bold text-[#00E599] font-pixel-title text-[10px] mb-0.5">BUKA DI CHROME TABLET</p>
+                  <p className="text-white/80 text-[11px]">Buka Google Chrome di tablet Anda, lalu ketik alamat:</p>
+                  <code className="inline-block mt-1 p-1 bg-black/60 text-[#FFD84D] font-mono text-[11px] border border-white/20 select-all">
+                    {tabletConnectionInfo.tabletBoothUrl || `http://192.168.110.93:3000/booth`}
+                  </code>
+                </div>
+              </div>
+
+              <div className="p-3 bg-[#0C1230] border border-[#5CE1E6]/60 flex items-start gap-2.5">
+                <span className="w-6 h-6 bg-[#5CE1E6] text-[#050C38] font-pixel-title font-bold text-xs flex items-center justify-center shrink-0">2</span>
+                <div>
+                  <p className="font-bold text-[#5CE1E6] font-pixel-title text-[10px] mb-0.5">KETUK MENU TITIK TIGA (⋮)</p>
+                  <p className="text-white/80 text-[11px]">Di pojok kanan atas layar Chrome tablet, ketuk menu titik tiga (<strong>⋮</strong>).</p>
+                </div>
+              </div>
+
+              <div className="p-3 bg-[#0C1230] border border-[#FE0168]/60 flex items-start gap-2.5">
+                <span className="w-6 h-6 bg-[#FE0168] text-white font-pixel-title font-bold text-xs flex items-center justify-center shrink-0">3</span>
+                <div>
+                  <p className="font-bold text-[#FE0168] font-pixel-title text-[10px] mb-0.5">PILIH &quot;PASANG APLIKASI&quot; (INSTALL APP)</p>
+                  <p className="text-white/80 text-[11px]">
+                    Pilih menu <strong>&quot;Pasang Aplikasi&quot;</strong> atau <strong>&quot;Tambahkan ke Layar Utama&quot;</strong>. Android akan otomatis mengunduh &amp; menginstal APK resmi ke layar utama tablet Anda!
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-2.5 bg-[#FFD84D]/10 border border-[#FFD84D]/40 text-[10.5px] text-[#FFD84D]">
+                ✨ <strong>Keunggulan Mode APK Kiosk:</strong> Saat dibuka dari layar utama tablet, aplikasi otomatis berjalan <strong>Layar Penuh (Full Screen Kiosk)</strong> tanpa bilah URL atau tab browser, sehingga pengunjung tidak bisa mengotak-atik sistem!
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsInstallModalOpen(false)}
+                className="w-full py-2.5 pixel-btn bg-[#00E599] hover:bg-[#5CE1E6] text-[#050C38] font-pixel-title font-bold text-xs active:scale-95 text-center"
+              >
+                MENGERTI, SAYA COBA DI TABLET
+              </button>
+            </div>
           </div>
         </div>
       )}

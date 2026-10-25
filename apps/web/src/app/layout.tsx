@@ -28,10 +28,21 @@ const pixelifySans = Pixelify_Sans({
   display: 'swap',
 });
 
+import { PwaRegister } from '@/components/pwa/PwaRegister';
+
 export const metadata: Metadata = {
   title: 'Photobooth Terintegrasi — Expo Wisuda TIK 2026',
   description: 'Sistem photobooth modern bertema Pixel Metropolitan dengan kamera Canon dan cetak 4R.',
   manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Photobooth TIK',
+  },
+  icons: {
+    icon: '/icons/icon-192.png',
+    apple: '/icons/icon-192.png',
+  },
 };
 
 export const viewport: Viewport = {
@@ -54,6 +65,7 @@ export default function RootLayout({
       className={`${bricolage.variable} ${figtree.variable} ${pressStart2P.variable} ${pixelifySans.variable}`}
     >
       <body className="min-h-screen bg-paper text-ink antialiased selection:bg-ultramarine selection:text-white">
+        <PwaRegister />
         {children}
       </body>
     </html>
