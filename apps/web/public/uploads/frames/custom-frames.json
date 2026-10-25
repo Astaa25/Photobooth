@@ -20,31 +20,59 @@
     "canvasHeight": 1800,
     "slots": [
       {
-        "x": 50,
-        "y": 330,
-        "width": 530,
-        "height": 600,
+        "x": 72,
+        "y": 122,
+        "width": 476,
+        "height": 270,
         "photo": 0
       },
       {
-        "x": 620,
-        "y": 330,
-        "width": 530,
-        "height": 600,
+        "x": 650,
+        "y": 122,
+        "width": 476,
+        "height": 270,
+        "photo": 0
+      },
+      {
+        "x": 72,
+        "y": 490,
+        "width": 476,
+        "height": 270,
         "photo": 1
       },
       {
-        "x": 50,
-        "y": 960,
-        "width": 530,
-        "height": 600,
+        "x": 650,
+        "y": 490,
+        "width": 476,
+        "height": 270,
+        "photo": 1
+      },
+      {
+        "x": 72,
+        "y": 858,
+        "width": 476,
+        "height": 270,
         "photo": 2
       },
       {
-        "x": 620,
-        "y": 960,
-        "width": 530,
-        "height": 600,
+        "x": 645,
+        "y": 858,
+        "width": 476,
+        "height": 270,
+        "photo": 2
+      },
+      {
+        "x": 70,
+        "y": 1230,
+        "width": 480,
+        "height": 276,
+        "photo": 3
+      },
+      {
+        "x": 640,
+        "y": 1230,
+        "width": 485,
+        "height": 276,
         "photo": 3
       }
     ]

@@ -52,6 +52,9 @@ interface TemplateOption {
   previewType: 'strip' | 'grid' | 'trio' | 'duo' | 'single';
   frameImage?: string;
   isCustom?: boolean;
+  slots?: { x: number; y: number; width: number; height: number; photo?: number; source_index?: number }[];
+  canvasWidth?: number;
+  canvasHeight?: number;
 }
 
 const TEMPLATES: TemplateOption[] = [
@@ -115,7 +118,7 @@ export default function BoothKioskPage() {
   const [retakeIndex, setRetakeIndex] = useState<number | null>(null);
   const [capturedPhotos, setCapturedPhotos] = useState<string[]>([]);
   const [isFlashActive, setIsFlashActive] = useState(false);
-  const [cameraSource, setCameraSource] = useState<'canon' | 'webcam'>('canon');
+  const [cameraSource, setCameraSource] = useState<'canon' | 'webcam'>('webcam');
   const [webcamStatus, setWebcamStatus] = useState<'idle' | 'connected' | 'error'>('idle');
   const [webcamErrorMsg, setWebcamErrorMsg] = useState<string | null>(null);
   const latestWebcamSnapshotRef = useRef<string | null>(null);
@@ -139,6 +142,8 @@ export default function BoothKioskPage() {
         const savedCam = localStorage.getItem('photobooth_selected_camera');
         if (savedCam === 'canon' || savedCam === 'webcam') {
           setCameraSource(savedCam);
+        } else {
+          setCameraSource('webcam');
         }
       } catch {}
     }
@@ -444,9 +449,7 @@ export default function BoothKioskPage() {
             const pool = newPalette.filter((c) => c !== oldColor);
             const fallbackColor = pool[Math.floor(Math.random() * pool.length)] || newPalette[0];
             const photoData =
-              cameraSource === 'webcam' && latestWebcamSnapshotRef.current
-                ? latestWebcamSnapshotRef.current
-                : fallbackColor;
+              latestWebcamSnapshotRef.current || fallbackColor;
             latestWebcamSnapshotRef.current = null;
 
             const updated = [...capturedPhotos];
@@ -464,9 +467,7 @@ export default function BoothKioskPage() {
           const colors = ['#1D4ED8', '#BE185D', '#047857', '#B45309', '#7C3AED', '#DB2777'];
           const fallbackColor = colors[currentPhotoIdx % colors.length];
           const photoData =
-            cameraSource === 'webcam' && latestWebcamSnapshotRef.current
-              ? latestWebcamSnapshotRef.current
-              : fallbackColor;
+            latestWebcamSnapshotRef.current || fallbackColor;
           latestWebcamSnapshotRef.current = null;
 
           const newPhotos = [...capturedPhotos, photoData];
@@ -1115,6 +1116,9 @@ export default function BoothKioskPage() {
             }
             templateName={selectedTemplate.name}
             frameImage={selectedTemplate.frameImage}
+            slots={selectedTemplate.slots}
+            canvasWidth={selectedTemplate.canvasWidth}
+            canvasHeight={selectedTemplate.canvasHeight}
             onReset={handleFinishSession}
           />
         )}

@@ -117,10 +117,10 @@ export function PixelCameraViewfinder({
 
   // Ambil snapshot foto dari video webcam saat countdown mencapai 0
   useEffect(() => {
-    if (countdownNum === 0 && cameraSource === 'webcam' && onSnapshotCapture && videoRef.current) {
+    if (countdownNum === 0 && onSnapshotCapture) {
       try {
         const video = videoRef.current;
-        if (video.videoWidth > 0 && video.videoHeight > 0) {
+        if (video && video.videoWidth > 0 && video.videoHeight > 0) {
           const canvas = document.createElement('canvas');
           canvas.width = video.videoWidth;
           canvas.height = video.videoHeight;
@@ -129,15 +129,52 @@ export function PixelCameraViewfinder({
             ctx.translate(canvas.width, 0);
             ctx.scale(-1, 1);
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
             onSnapshotCapture(dataUrl);
+            return;
           }
+        }
+
+        // Fallback: Jika sensor video belum aktif / mode Canon tanpa DSLR fisik, buat kartu foto beranimasi
+        const canvas = document.createElement('canvas');
+        canvas.width = 1280;
+        canvas.height = 720;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          const grad = ctx.createLinearGradient(0, 0, 1280, 720);
+          grad.addColorStop(0, '#131947');
+          grad.addColorStop(0.5, '#160078');
+          grad.addColorStop(1, '#050C38');
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, 1280, 720);
+
+          ctx.strokeStyle = 'rgba(92, 225, 230, 0.2)';
+          ctx.lineWidth = 1;
+          for (let x = 0; x < 1280; x += 40) {
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 720); ctx.stroke();
+          }
+
+          ctx.strokeStyle = '#FFD84D';
+          ctx.lineWidth = 5;
+          ctx.strokeRect(100, 60, 1080, 600);
+
+          ctx.fillStyle = '#00E599';
+          ctx.font = 'bold 36px monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(`EXPO WISUDA TIK 2026 • POSE #${currentPhotoIdx + 1}`, 640, 330);
+
+          ctx.fillStyle = '#FFD84D';
+          ctx.font = 'bold 22px monospace';
+          ctx.fillText(`${new Date().toLocaleTimeString('id-ID')} WIB • LIVE PHOTO SNAPSHOT`, 640, 390);
+
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+          onSnapshotCapture(dataUrl);
         }
       } catch (err) {
         console.warn('Peringatan saat mengambil snapshot video:', err);
       }
     }
-  }, [countdownNum, cameraSource, onSnapshotCapture]);
+  }, [countdownNum, onSnapshotCapture, currentPhotoIdx]);
 
   const activeDeviceLabel = cameraSource === 'webcam' ? webcamLabel : cameraName;
 

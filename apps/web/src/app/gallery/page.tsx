@@ -18,6 +18,7 @@ import {
 import { PixelCameraIcon, PixelPrinterIcon, PixelTicketIcon } from '@/components/pixel/PixelIcons';
 import { PixelCrossStar, PixelStreetLamp, PixelVendingMachine } from '@/components/pixel/PixelPosterDecorations';
 import { retroAudio } from '@/utils/audio';
+import { downloadCompositePhotoStrip, downloadSinglePhoto } from '@/utils/photoDownloadHelper';
 
 interface VisitorGalleryItem {
   id: string;
@@ -175,24 +176,100 @@ export default function GalleryPage() {
     return () => clearInterval(interval);
   }, [selectedVisitor]);
 
-  // Unduh Satu File Tertentu
-  const handleDownloadSingle = (fileName: string) => {
+  // Unduh Satu Foto Individual
+  const handleDownloadPhoto = async (photo: { id: number; color: string; label?: string }) => {
+    if (!selectedVisitor) return;
     retroAudio.playPrintSound();
-    setSingleDownloadSuccess(fileName);
-    setTimeout(() => setSingleDownloadSuccess(null), 2500);
+    try {
+      const fileName = `${selectedVisitor.nickname}_Foto_${photo.id}.jpg`;
+      await downloadSinglePhoto(
+        photo.color,
+        fileName,
+        `${selectedVisitor.nickname} - ${photo.label || `Pose #${photo.id}`}`
+      );
+      setSingleDownloadSuccess(fileName);
+      retroAudio.playSuccessChime();
+      setTimeout(() => setSingleDownloadSuccess(null), 2500);
+    } catch (err) {
+      console.warn('Gagal mengunduh foto:', err);
+    }
   };
 
-  // Unduh Semua File Sekaligus (ZIP)
-  const handleDownloadAllZip = () => {
+  // Unduh Frame Komposit 4R
+  const handleDownloadFrame4R = async () => {
+    if (!selectedVisitor) return;
+    retroAudio.playPrintSound();
+    try {
+      const fileName = `${selectedVisitor.nickname}_Frame_4R.jpg`;
+      await downloadCompositePhotoStrip({
+        photos: selectedVisitor.photos.map((p) => p.color),
+        visitorName: selectedVisitor.nickname,
+        ticketNumber: selectedVisitor.number,
+        templateName: selectedVisitor.template,
+        fileName,
+      });
+      setSingleDownloadSuccess(fileName);
+      retroAudio.playSuccessChime();
+      setTimeout(() => setSingleDownloadSuccess(null), 2500);
+    } catch (err) {
+      console.warn('Gagal mengunduh frame 4R:', err);
+    }
+  };
+
+  // Unduh Video Rekap (Slideshow Klip)
+  const handleDownloadVideo = async () => {
+    if (!selectedVisitor) return;
+    retroAudio.playPrintSound();
+    try {
+      const fileName = `${selectedVisitor.nickname}_Video_Rekap.jpg`;
+      const activePhoto = selectedVisitor.photos[videoFrameIdx] || selectedVisitor.photos[0];
+      await downloadSinglePhoto(
+        activePhoto?.color || '#1D4ED8',
+        fileName,
+        `${selectedVisitor.nickname} - Video Slideshow Clip`
+      );
+      setSingleDownloadSuccess(fileName);
+      retroAudio.playSuccessChime();
+      setTimeout(() => setSingleDownloadSuccess(null), 2500);
+    } catch (err) {
+      console.warn('Gagal mengunduh video rekap:', err);
+    }
+  };
+
+  // Unduh Semua File Sekaligus (Frame 4R + Seluruh Foto)
+  const handleDownloadAllZip = async () => {
     if (!selectedVisitor) return;
     retroAudio.playPrintSound();
     setDownloadingZip(true);
-    setTimeout(() => {
-      setDownloadingZip(false);
+    try {
+      // 1. Unduh Frame 4R
+      await downloadCompositePhotoStrip({
+        photos: selectedVisitor.photos.map((p) => p.color),
+        visitorName: selectedVisitor.nickname,
+        ticketNumber: selectedVisitor.number,
+        templateName: selectedVisitor.template,
+        fileName: `${selectedVisitor.nickname}_Frame_4R.jpg`,
+      });
+
+      // 2. Unduh setiap foto individual berturut-turut
+      for (let i = 0; i < selectedVisitor.photos.length; i++) {
+        const photo = selectedVisitor.photos[i];
+        await new Promise((r) => setTimeout(r, 350));
+        await downloadSinglePhoto(
+          photo.color,
+          `${selectedVisitor.nickname}_Foto_${photo.id}.jpg`,
+          `${selectedVisitor.nickname} - Foto #${photo.id}`
+        );
+      }
+
       setDownloadSuccess(true);
       retroAudio.playSuccessChime();
       setTimeout(() => setDownloadSuccess(false), 3000);
-    }, 1400);
+    } catch (err) {
+      console.warn('Gagal mengunduh paket berkas:', err);
+    } finally {
+      setDownloadingZip(false);
+    }
   };
 
   // Filter daftar berdasarkan pencarian
@@ -446,7 +523,7 @@ export default function GalleryPage() {
 
                     <div>
                       <button
-                        onClick={() => handleDownloadSingle(`${selectedVisitor.nickname}_Video_Rekap.mp4`)}
+                        onClick={handleDownloadVideo}
                         className="h-11 px-6 pixel-btn bg-[#E02F75] hover:bg-[#FE0168] text-xs font-pixel-title text-white flex items-center justify-center gap-2 shadow-[3px_3px_0_0_#050C38]"
                       >
                         <Download className="w-4 h-4" />
@@ -499,7 +576,7 @@ export default function GalleryPage() {
                     </p>
 
                     <button
-                      onClick={() => handleDownloadSingle(`${selectedVisitor.nickname}_Frame_4R.jpg`)}
+                      onClick={handleDownloadFrame4R}
                       className="h-10 px-5 pixel-btn bg-[#7226FF] hover:bg-[#8645FF] text-xs font-pixel-title text-white flex items-center gap-2"
                     >
                       <Download className="w-3.5 h-3.5" />
@@ -545,7 +622,7 @@ export default function GalleryPage() {
                       </div>
 
                       <button
-                        onClick={() => handleDownloadSingle(`${selectedVisitor.nickname}_Foto_${photo.id}.jpg`)}
+                        onClick={() => handleDownloadPhoto(photo)}
                         className="w-10 h-10 pixel-box bg-[#050C38] hover:bg-[#E02F75] text-[#5CE1E6] hover:text-white shrink-0 flex items-center justify-center transition-colors"
                         title={`Unduh ${photo.label || `Foto ${photo.id}`}`}
                       >
