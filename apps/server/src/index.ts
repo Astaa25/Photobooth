@@ -125,3 +125,5 @@ if (process.argv[1] && process.argv[1].endsWith('index.ts')) {
     });
   });
 }
+
+export default createServer;
