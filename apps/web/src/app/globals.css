@@ -224,4 +224,13 @@ button, .pixel-btn, input, textarea, select {
   background: #E02F75;
 }
 
-
+/* Sembunyikan Logo N / Dev Indicator Next.js */
+[data-nextjs-dev-indicator],
+#next-dev-indicator,
+nextjs-portal,
+[data-nextjs-toast] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
