@@ -3,18 +3,9 @@
   "services": {
     "web": {
       "root": "apps/web"
-    },
-    "server": {
-      "root": "apps/server"
     }
   },
   "rewrites": [
-    {
-      "source": "/server/(.*)",
-      "destination": {
-        "service": "server"
-      }
-    },
     {
       "source": "/(.*)",
       "destination": {
