@@ -14,15 +14,6 @@ export interface QueueItemData {
   printCopies?: number;
 }
 
-const DEFAULT_INITIAL_QUEUE: QueueItemData[] = [
-  { id: '1', number: '#001', nickname: 'Diana', status: 'IN_SESSION', registeredAt: '10:14', printCopies: 2 },
-  { id: '2', number: '#002', nickname: 'Budi & Sari', status: 'QUEUED', registeredAt: '10:18', printCopies: 1 },
-  { id: '3', number: '#003', nickname: 'Kelompok 4 Wisuda', status: 'QUEUED', registeredAt: '10:22', printCopies: 3 },
-  { id: '4', number: '#004', nickname: 'Aris', status: 'WAITING', registeredAt: '10:05', printCopies: 1 },
-  { id: '5', number: '#005', nickname: 'Rani', status: 'DONE', registeredAt: '09:55', printCopies: 2 },
-  { id: '6', number: '#006', nickname: 'Keluarga Dosen TIK', status: 'PRINT_ORDER', registeredAt: '10:30', printCopies: 2 },
-];
-
 function getDbClient() {
   const dbUrl = process.env.DATABASE_URL;
   if (!dbUrl) return null;
@@ -38,12 +29,12 @@ function loadFromDisk(): QueueItemData[] {
     if (fs.existsSync(QUEUE_DISK_FILE)) {
       const raw = fs.readFileSync(QUEUE_DISK_FILE, 'utf8');
       const data = JSON.parse(raw);
-      if (Array.isArray(data) && data.length > 0) return data;
+      if (Array.isArray(data)) return data;
     }
   } catch (err) {
     console.error('Gagal membaca queue.json:', err);
   }
-  return DEFAULT_INITIAL_QUEUE;
+  return [];
 }
 
 function saveToDisk(items: QueueItemData[]): void {
@@ -66,17 +57,21 @@ export async function GET() {
   if (sql) {
     try {
       // Ambil event aktif
-      const events = await sql`SELECT id, name FROM events WHERE is_active = true LIMIT 1`;
+      const events = await sql`SELECT id, name, current_queue_number FROM events WHERE is_active = true LIMIT 1`;
       let eventId: string;
+      let nextNumber = 1;
+
       if (events.length === 0) {
         const [newEvent] = await sql`
           INSERT INTO events (name, is_active, current_queue_number)
-          VALUES ('Expo Wisuda Jurusan TIK 2026', true, 6)
-          RETURNING id
+          VALUES ('Expo Wisuda Jurusan TIK 2026', true, 1)
+          RETURNING id, current_queue_number
         `;
         eventId = newEvent.id;
+        nextNumber = newEvent.current_queue_number || 1;
       } else {
         eventId = events[0].id;
+        nextNumber = events[0].current_queue_number || 1;
       }
 
       // Ambil seluruh tiket antrean
@@ -93,38 +88,22 @@ export async function GET() {
         ORDER BY q.number ASC
       `;
 
-      if (rows.length > 0) {
-        const mapped: QueueItemData[] = rows.map((r: any) => ({
-          id: String(r.id),
-          number: '#' + String(r.number).padStart(3, '0'),
-          nickname: r.nickname || 'Pengunjung',
-          status: (r.status || 'QUEUED').toUpperCase(),
-          registeredAt: new Date(r.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
-          printCopies: 1,
-        }));
+      const mapped: QueueItemData[] = rows.map((r: any) => ({
+        id: String(r.id),
+        number: '#' + String(r.number).padStart(3, '0'),
+        nickname: r.nickname || 'Pengunjung',
+        status: (r.status || 'QUEUED').toUpperCase(),
+        registeredAt: new Date(r.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+        printCopies: 1,
+      }));
 
-        saveToDisk(mapped);
-        return NextResponse.json({ success: true, data: mapped, source: 'supabase_postgres' });
-      }
-
-      // Jika database masih kosong (0 baris), inisialisasi dengan DEFAULT_INITIAL_QUEUE ke dalam database
-      const diskItems = loadFromDisk();
-      for (const item of diskItems) {
-        const numInt = parseInt(item.number.replace(/\D/g, '') || '1', 10);
-        const [vis] = await sql`
-          INSERT INTO visitors (event_id, nickname)
-          VALUES (${eventId}, ${item.nickname})
-          RETURNING id
-        `;
-        await sql`
-          INSERT INTO queue_tickets (event_id, visitor_id, number, status)
-          VALUES (${eventId}, ${vis.id}, ${numInt}, ${item.status.toLowerCase()})
-          ON CONFLICT DO NOTHING
-        `;
-      }
-
-      saveToDisk(diskItems);
-      return NextResponse.json({ success: true, data: diskItems, source: 'supabase_seeded' });
+      saveToDisk(mapped);
+      return NextResponse.json({
+        success: true,
+        data: mapped,
+        nextNumber,
+        source: 'supabase_postgres',
+      });
     } catch (err: any) {
       console.warn('PostgreSQL query gagal, beralih ke disk fallback:', err.message);
     }
@@ -132,30 +111,136 @@ export async function GET() {
 
   // Fallback ke penyimpanan disk lokal jika database tidak terhubung
   const diskData = loadFromDisk();
-  return NextResponse.json({ success: true, data: diskData, source: 'disk_local' });
+  let maxNum = 0;
+  for (const d of diskData) {
+    const num = parseInt(d.number.replace(/\D/g, '') || '0', 10);
+    if (num > maxNum) maxNum = num;
+  }
+  return NextResponse.json({
+    success: true,
+    data: diskData,
+    nextNumber: maxNum + 1,
+    source: 'disk_local',
+  });
 }
 
 /**
  * POST /api/queue
- * Tambah antrean tiket baru ke database
+ * Tambah antrean tiket baru ke database ATAU reset urutan nomor ke #001
  */
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const nickname = (body.nickname || 'Pengunjung').trim();
-    const diskItems = loadFromDisk();
+    const { searchParams } = new URL(req.url);
+    const body = await req.json().catch(() => ({}));
+    const isReset = searchParams.get('action') === 'reset_sequence' || body.action === 'reset_sequence';
 
-    // Hitung nomor tiket urut
-    let nextNumInt = 1;
-    if (diskItems.length > 0) {
-      const maxNum = Math.max(...diskItems.map((d) => parseInt(d.number.replace(/\D/g, '') || '0', 10)));
-      nextNumInt = maxNum + 1;
+    const sql = getDbClient();
+
+    // ==========================================
+    // AKSI 1: RESET URUTAN KE #001
+    // ==========================================
+    if (isReset) {
+      if (sql) {
+        try {
+          const events = await sql`SELECT id FROM events WHERE is_active = true LIMIT 1`;
+          if (events.length > 0) {
+            const eventId = events[0].id;
+            // 1. Hapus tiket lama
+            await sql`DELETE FROM queue_tickets WHERE event_id = ${eventId}`;
+            // 2. Set ulang counter urutan nomor tiket ke 1
+            await sql`UPDATE events SET current_queue_number = 1 WHERE id = ${eventId}`;
+          } else {
+            await sql`
+              INSERT INTO events (name, is_active, current_queue_number)
+              VALUES ('Expo Wisuda Jurusan TIK 2026', true, 1)
+            `;
+          }
+        } catch (dbErr: any) {
+          console.warn('Gagal reset PostgreSQL queue:', dbErr.message);
+        }
+      }
+
+      // Bersihkan juga queue.json lokal
+      saveToDisk([]);
+
+      return NextResponse.json({
+        success: true,
+        message: 'Urutan antrean berhasil diatur ulang dari #001',
+        nextNumber: 1,
+        data: [],
+      });
     }
-    const formattedNumber = body.number || ('#' + String(nextNumInt).padStart(3, '0'));
-    const finalNumInt = parseInt(String(formattedNumber).replace(/\D/g, '') || String(nextNumInt), 10);
+
+    // ==========================================
+    // AKSI 2: TAMBAH TIKET BARU
+    // ==========================================
+    const nickname = (body.nickname || 'Pengunjung').trim();
+    let assignedNumInt = 1;
+    let newTicketId = body.id || `ticket-${Date.now()}`;
+
+    if (sql) {
+      try {
+        const events = await sql`SELECT id, current_queue_number FROM events WHERE is_active = true LIMIT 1`;
+        let eventId: string;
+
+        if (events.length === 0) {
+          const [newEvent] = await sql`
+            INSERT INTO events (name, is_active, current_queue_number)
+            VALUES ('Expo Wisuda Jurusan TIK 2026', true, 2)
+            RETURNING id
+          `;
+          eventId = newEvent.id;
+          assignedNumInt = 1;
+        } else {
+          eventId = events[0].id;
+          assignedNumInt = events[0].current_queue_number || 1;
+          // Naikkan counter urutan nomor tiket berikutnya
+          await sql`
+            UPDATE events 
+            SET current_queue_number = ${assignedNumInt + 1} 
+            WHERE id = ${eventId}
+          `;
+        }
+
+        // Simpan pengunjung
+        const [vis] = await sql`
+          INSERT INTO visitors (event_id, nickname)
+          VALUES (${eventId}, ${nickname})
+          RETURNING id
+        `;
+
+        // Simpan tiket antrean
+        const initialStatus = (body.status || 'queued').toLowerCase();
+        const [tkt] = await sql`
+          INSERT INTO queue_tickets (event_id, visitor_id, number, status)
+          VALUES (${eventId}, ${vis.id}, ${assignedNumInt}, ${initialStatus})
+          RETURNING id
+        `;
+        newTicketId = String(tkt.id);
+      } catch (dbErr: any) {
+        console.warn('Gagal simpan ke Postgres, fallback ke disk:', dbErr.message);
+        const diskItems = loadFromDisk();
+        let maxNum = 0;
+        for (const d of diskItems) {
+          const num = parseInt(d.number.replace(/\D/g, '') || '0', 10);
+          if (num > maxNum) maxNum = num;
+        }
+        assignedNumInt = maxNum + 1;
+      }
+    } else {
+      const diskItems = loadFromDisk();
+      let maxNum = 0;
+      for (const d of diskItems) {
+        const num = parseInt(d.number.replace(/\D/g, '') || '0', 10);
+        if (num > maxNum) maxNum = num;
+      }
+      assignedNumInt = maxNum + 1;
+    }
+
+    const formattedNumber = '#' + String(assignedNumInt).padStart(3, '0');
 
     const newItem: QueueItemData = {
-      id: body.id || `ticket-${Date.now()}`,
+      id: newTicketId,
       number: formattedNumber,
       nickname,
       status: (body.status || 'QUEUED').toUpperCase(),
@@ -163,32 +248,16 @@ export async function POST(req: Request) {
       printCopies: body.printCopies || 1,
     };
 
-    const sql = getDbClient();
-    if (sql) {
-      try {
-        const [event] = await sql`SELECT id FROM events WHERE is_active = true LIMIT 1`;
-        if (event) {
-          const [vis] = await sql`
-            INSERT INTO visitors (event_id, nickname)
-            VALUES (${event.id}, ${nickname})
-            RETURNING id
-          `;
-          const [tkt] = await sql`
-            INSERT INTO queue_tickets (event_id, visitor_id, number, status)
-            VALUES (${event.id}, ${vis.id}, ${finalNumInt}, ${newItem.status.toLowerCase()})
-            RETURNING id
-          `;
-          newItem.id = String(tkt.id);
-        }
-      } catch (dbErr: any) {
-        console.warn('Gagal menyimpan tiket ke Postgres, disimpan ke disk:', dbErr.message);
-      }
-    }
-
-    const updatedDisk = [newItem, ...diskItems.filter((i) => i.number !== newItem.number)];
+    // Perbarui queue.json di disk
+    const diskItems = loadFromDisk();
+    const updatedDisk = [...diskItems.filter((i) => i.number !== newItem.number), newItem];
     saveToDisk(updatedDisk);
 
-    return NextResponse.json({ success: true, item: newItem });
+    return NextResponse.json({
+      success: true,
+      item: newItem,
+      nextNumber: assignedNumInt + 1,
+    });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
@@ -246,13 +315,30 @@ export async function PATCH(req: Request) {
 
 /**
  * DELETE /api/queue
- * Hapus tiket antrean
+ * Hapus tiket antrean tunggal atau bersihkan seluruh antrean
  */
 export async function DELETE(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
     const number = searchParams.get('number');
+    const isAll = searchParams.get('all') === 'true';
+
+    const sql = getDbClient();
+
+    if (isAll) {
+      saveToDisk([]);
+      if (sql) {
+        try {
+          const events = await sql`SELECT id FROM events WHERE is_active = true LIMIT 1`;
+          if (events.length > 0) {
+            await sql`DELETE FROM queue_tickets WHERE event_id = ${events[0].id}`;
+            await sql`UPDATE events SET current_queue_number = 1 WHERE id = ${events[0].id}`;
+          }
+        } catch {}
+      }
+      return NextResponse.json({ success: true, message: 'Semua antrean dihapus' });
+    }
 
     const diskItems = loadFromDisk();
     const filtered = diskItems.filter((item) => {
@@ -262,7 +348,6 @@ export async function DELETE(req: Request) {
     });
     saveToDisk(filtered);
 
-    const sql = getDbClient();
     if (sql) {
       try {
         const numInt = number ? parseInt(String(number).replace(/\D/g, '') || '0', 10) : null;

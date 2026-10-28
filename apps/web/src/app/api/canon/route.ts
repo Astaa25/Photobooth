@@ -72,23 +72,19 @@ interface CanonStatusResult {
  * Cek status koneksi kamera Canon via digiCamControl (Dual Mode: HTTP & Native CLI)
  */
 async function checkCanonStatus(): Promise<CanonStatusResult> {
-  // 1. Cek via HTTP Port 5513 jika web server digiCamControl aktif
+  // 1. Cek via HTTP Port 5513 (digiCamControl web server yang aktif)
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 1200);
-
-    const res = await fetch(`${DIGICAM_BASE_URL}/?CMD=All_Camera_List`, {
-      signal: controller.signal,
+    const res = await fetch(`${DIGICAM_BASE_URL}/session.json`, {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(1500),
     });
-    clearTimeout(timeout);
 
     if (res.ok) {
-      const text = await res.text();
-      const clean = text.trim();
-      if (clean && !clean.toLowerCase().includes('no camera')) {
+      const data = await res.json().catch(() => null);
+      if (data) {
         return {
           connected: true,
-          cameraName: clean,
+          cameraName: 'Canon EOS 1200D',
           method: 'http',
           digicamRunning: true,
         };
@@ -96,11 +92,27 @@ async function checkCanonStatus(): Promise<CanonStatusResult> {
     }
   } catch {}
 
+  // 1B. Cek apakah preview.jpg atau liveview.jpg bisa diakses
+  try {
+    const prevRes = await fetch(`${DIGICAM_BASE_URL}/preview.jpg`, {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(1200),
+    });
+    if (prevRes.ok) {
+      return {
+        connected: true,
+        cameraName: 'Canon EOS 1200D',
+        method: 'http',
+        digicamRunning: true,
+      };
+    }
+  } catch {}
+
   // 2. Cek via CameraControlRemoteCmd.exe (Native Windows IPC ke CameraControl.exe)
   const cliPath = getRemoteCmdPath();
   if (cliPath) {
     try {
-      const { stdout } = await execFileAsync(cliPath, ['/c', 'get camera.name'], { timeout: 2000 });
+      const { stdout } = await execFileAsync(cliPath, ['/c', 'get iso'], { timeout: 2000 });
       const output = (stdout || '').trim();
 
       if (output.includes('no camera is connected')) {
@@ -113,12 +125,10 @@ async function checkCanonStatus(): Promise<CanonStatusResult> {
         };
       }
 
-      if (output.includes('Canon') || output.includes(':;response:ok')) {
-        const valMatch = output.match(/value:([^;\r\n]+)/);
-        const name = valMatch ? valMatch[1].trim() : 'Canon EOS 1200D';
+      if (output.includes(':;response:')) {
         return {
           connected: true,
-          cameraName: name,
+          cameraName: 'Canon EOS 1200D',
           method: 'cli',
           digicamRunning: true,
         };
@@ -202,6 +212,8 @@ export async function GET() {
     digicamUrl: DIGICAM_BASE_URL,
     laptopIp,
     tabletBoothUrl: `http://${laptopIp}:3000/booth`,
+    hasLiveView: status.connected,
+    liveViewUrl: `/api/canon/liveview`,
     timestamp: Date.now(),
   });
 }
@@ -222,44 +234,65 @@ export async function POST(req: Request) {
 
     if (canonStatus.connected) {
       try {
-        // 1. Kirim perintah capture via HTTP jika port 5513 aktif
-        if (canonStatus.method === 'http') {
-          const capRes = await fetch(`${DIGICAM_BASE_URL}/?CMD=Capture`, {
-            signal: AbortSignal.timeout(10000),
-          });
+        // 1. Kirim perintah capture ke digiCamControl
+        await fetch(`${DIGICAM_BASE_URL}/?CMD=Capture`, {
+          signal: AbortSignal.timeout(12000),
+        }).catch(() => null);
 
-          if (capRes.ok) {
-            await new Promise((r) => setTimeout(r, 1200));
-            const lastImgRes = await fetch(`${DIGICAM_BASE_URL}/lastcaptured.jpg`, {
-              signal: AbortSignal.timeout(5000),
-            }).catch(() => null);
+        // Tunggu kamera menjepret dan mentransfer file ke PC
+        await new Promise((r) => setTimeout(r, 1800));
 
-            if (lastImgRes && lastImgRes.ok) {
-              const arrayBuffer = await lastImgRes.arrayBuffer();
-              const base64 = Buffer.from(arrayBuffer).toString('base64');
-              return NextResponse.json({
-                success: true,
-                photoUrl: `data:image/jpeg;base64,${base64}`,
-                source: 'canon-hardware',
-                cameraName: canonStatus.cameraName,
-                message: 'Foto berhasil diambil dari sensor Canon EOS 1200D!',
-              });
-            }
+        // 2. Ambil gambar dari endpoint preview.jpg digiCamControl
+        const lastImgRes = await fetch(`${DIGICAM_BASE_URL}/preview.jpg?rand=${Date.now()}`, {
+          cache: 'no-store',
+          signal: AbortSignal.timeout(5000),
+        }).catch(() => null);
+
+        if (lastImgRes && lastImgRes.ok) {
+          const arrayBuffer = await lastImgRes.arrayBuffer();
+          if (arrayBuffer.byteLength > 1000) {
+            const base64 = Buffer.from(arrayBuffer).toString('base64');
+            return NextResponse.json({
+              success: true,
+              photoUrl: `data:image/jpeg;base64,${base64}`,
+              source: 'canon-hardware',
+              cameraName: 'Canon EOS 1200D',
+              message: 'Foto berhasil diambil langsung dari sensor Canon EOS 1200D!',
+            });
           }
-        } else if (canonStatus.method === 'cli') {
-          // 2. Kirim perintah capture via Native CLI IPC
-          const cliPath = getRemoteCmdPath();
-          if (cliPath) {
-            await execFileAsync(cliPath, ['/c', 'Capture'], { timeout: 10000 });
-            await new Promise((r) => setTimeout(r, 1500));
+        }
+
+        // 3. Fallback folder lokal laptop: C:\Users\ASUS\OneDrive\Pictures\digiCamControl\Session1
+        const sessionFolder = path.resolve(process.env.USERPROFILE || 'C:\\Users\\ASUS', 'OneDrive\\Pictures\\digiCamControl\\Session1');
+        if (fs.existsSync(sessionFolder)) {
+          const files = fs
+            .readdirSync(sessionFolder)
+            .filter((f) => f.toLowerCase().endsWith('.jpg') || f.toLowerCase().endsWith('.jpeg'))
+            .map((f) => ({
+              file: f,
+              time: fs.statSync(path.join(sessionFolder, f)).mtimeMs,
+            }))
+            .sort((a, b) => b.time - a.time);
+
+          if (files.length > 0) {
+            const latestFile = path.join(sessionFolder, files[0].file);
+            const buf = fs.readFileSync(latestFile);
+            const base64 = buf.toString('base64');
+            return NextResponse.json({
+              success: true,
+              photoUrl: `data:image/jpeg;base64,${base64}`,
+              source: 'canon-hardware',
+              cameraName: 'Canon EOS 1200D',
+              message: 'Foto berhasil diambil dari file sesi Canon EOS 1200D!',
+            });
           }
         }
       } catch (err: any) {
-        console.warn('Gagal mengambil gambar langsung dari digiCamControl, fallback ke preview cerdas:', err?.message);
+        console.warn('Gagal mengambil gambar langsung dari digiCamControl:', err?.message || err);
       }
     }
 
-    // 3. Fallback Foto Simulasi Cerdas agar alur bilik tidak pernah macet
+    // 4. Fallback Foto Simulasi Cerdas agar alur bilik tidak pernah macet
     const fallbackPhoto = generateFallbackCanonPhoto(photoIndex, visitorName);
 
     return NextResponse.json({

@@ -1,7 +1,7 @@
 /**
  * ticketSequence.ts
  * Mengelola nomor urut tiket photobooth (#001, #002, ...) secara berkesinambungan
- * dan tersinkronisasi antar-tab/bilik booth.
+ * dan tersinkronisasi antar-tab/bilik booth dan server database.
  */
 
 const STORAGE_KEY = 'photobooth_ticket_counter';
@@ -78,4 +78,21 @@ export function setTicketSequence(startNum: number): void {
     });
     channel.close();
   } catch {}
+}
+
+/**
+ * Sinkronkan counter lokal dari database server
+ */
+export async function syncTicketSequenceFromServer(): Promise<number> {
+  if (typeof window === 'undefined') return 1;
+  try {
+    const res = await fetch('/api/queue');
+    const json = await res.json();
+    if (json.success && typeof json.nextNumber === 'number') {
+      const nextNum = Math.max(1, json.nextNumber);
+      localStorage.setItem(STORAGE_KEY, nextNum.toString());
+      return nextNum;
+    }
+  } catch {}
+  return 1;
 }

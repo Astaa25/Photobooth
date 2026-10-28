@@ -44,6 +44,18 @@ export function PixelCameraViewfinder({
   const [webcamLabel, setWebcamLabel] = useState<string>('KAMERA LAPTOP HD');
   const [devices, setDevices] = useState<WebcamDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>(selectedWebcamId || '');
+  const [liveViewTimestamp, setLiveViewTimestamp] = useState<number>(Date.now());
+  const [hasLiveViewStream, setHasLiveViewStream] = useState<boolean>(false);
+
+  // Polling LiveView dari sensor Canon EOS 1200D jika mode Canon aktif
+  useEffect(() => {
+    if (cameraSource === 'canon' && canonConnected) {
+      const interval = setInterval(() => {
+        setLiveViewTimestamp(Date.now());
+      }, 180);
+      return () => clearInterval(interval);
+    }
+  }, [cameraSource, canonConnected]);
 
   // Efek simulasi level audio VU meter 8-bit
   useEffect(() => {
@@ -188,19 +200,34 @@ export function PixelCameraViewfinder({
 
   return (
     <div className="relative w-full aspect-[4/3] max-w-2xl mx-auto bg-black/90 pixel-box border-4 border-[#4B57B2] flex flex-col items-center justify-center overflow-hidden select-none font-pixel">
-      {/* 0. Live Video Feed Cermin (Berfungsi untuk Webcam & Pratinjau Cermin Canon) */}
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted
-        className={`absolute inset-0 w-full h-full object-cover scale-x-[-1] z-0 transition-opacity duration-300 ${
-          hasWebcamStream ? 'opacity-90' : 'opacity-0'
-        }`}
-      />
+      {/* 0. Live Video Feed Cermin Webcam */}
+      {cameraSource === 'webcam' && (
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className={`absolute inset-0 w-full h-full object-cover scale-x-[-1] z-0 transition-opacity duration-300 ${
+            hasWebcamStream ? 'opacity-90' : 'opacity-0'
+          }`}
+        />
+      )}
 
-      {/* 0A. Latar Studio Retro Animasi jika Cermin Video Belum Terhubung */}
-      {!hasWebcamStream && (
+      {/* 0A. Live View Asli dari Lensa Kamera Canon EOS 1200D */}
+      {cameraSource === 'canon' && (
+        <img
+          src={`/api/canon/liveview?t=${liveViewTimestamp}`}
+          alt="Canon EOS 1200D Live View"
+          onLoad={() => setHasLiveViewStream(true)}
+          onError={() => setHasLiveViewStream(false)}
+          className={`absolute inset-0 w-full h-full object-cover z-0 transition-opacity duration-300 ${
+            hasLiveViewStream ? 'opacity-95' : 'opacity-0'
+          }`}
+        />
+      )}
+
+      {/* 0B. Latar Studio Retro Animasi jika Feed LiveView / Webcam Belum Tersedia */}
+      {((cameraSource === 'webcam' && !hasWebcamStream) || (cameraSource === 'canon' && !hasLiveViewStream)) && (
         <div className="absolute inset-0 z-0 bg-gradient-to-b from-[#0C1230] via-[#160078] to-[#050C38] flex flex-col items-center justify-center p-6 text-center">
           {/* Animasi Siluet Karakter Posing */}
           <div className="relative mb-3 flex flex-col items-center animate-pulse">

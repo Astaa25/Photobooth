@@ -36,29 +36,34 @@ export default function RegisterPage() {
     setIsSubmitting(true);
 
     try {
-      // Panggilan pendaftaran antrean berurut (tanpa nomor acak)
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      // Panggilan pendaftaran antrean berurut langsung ke Database Server (/api/queue)
+      const res = await fetch('/api/queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nickname: nickname.trim(),
+          phone: phone || undefined,
+          status: 'QUEUED',
+        }),
+      });
 
-      const formattedNum = getAndAdvanceTicketNumber();
+      const json = await res.json();
+      if (!json.success || !json.item) {
+        throw new Error(json.error || 'Gagal menyimpan ke database server.');
+      }
 
+      const assignedNum = json.item.number;
       retroAudio.playSuccessChime();
 
       setTicket({
-        number: formattedNum,
-        nickname,
+        number: assignedNum,
+        nickname: json.item.nickname,
         status: 'DALAM ANTREAN',
       });
 
       // Simpan & pancarkan ke dashboard admin secara real-time
       try {
-        const newItem = {
-          id: `reg-${Date.now()}`,
-          number: formattedNum,
-          nickname,
-          status: 'QUEUED',
-          registeredAt: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
-          printCopies: 1,
-        };
+        const newItem = json.item;
         const existing = JSON.parse(localStorage.getItem('photobooth_registered_tickets') || '[]');
         localStorage.setItem('photobooth_registered_tickets', JSON.stringify([newItem, ...existing]));
 
@@ -66,8 +71,15 @@ export default function RegisterPage() {
         ch.postMessage({ type: 'NEW_REGISTRATION', item: newItem });
         ch.close();
       } catch {}
-    } catch {
-      setError('Terjadi kesalahan saat mendaftar. Silakan coba lagi.');
+    } catch (err: any) {
+      console.error('Pendaftaran gagal:', err);
+      // Fallback lokal jika jaringan offline
+      const fallbackNum = getAndAdvanceTicketNumber();
+      setTicket({
+        number: fallbackNum,
+        nickname,
+        status: 'DALAM ANTREAN',
+      });
     } finally {
       setIsSubmitting(false);
     }

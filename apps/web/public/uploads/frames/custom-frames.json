@@ -76,5 +76,70 @@
         "photo": 3
       }
     ]
+  },
+  {
+    "slug": "custom-1792949477140",
+    "name": "TESTING 1",
+    "desc": "3 foto 4R kustom",
+    "photoCount": 3,
+    "previewType": "grid",
+    "category": "Grid",
+    "tags": [
+      "grid",
+      "4 foto",
+      "cetak 4R"
+    ],
+    "bgColor": "#131947",
+    "order": 99,
+    "showInBooth": true,
+    "frameImage": "/uploads/frames/frame-1792949477140.png",
+    "isCustom": true,
+    "slotRatio": "4:3",
+    "canvasWidth": 1200,
+    "canvasHeight": 1800,
+    "slots": [
+      {
+        "x": 40,
+        "y": 293,
+        "width": 522,
+        "height": 420,
+        "photo": 0
+      },
+      {
+        "x": 637,
+        "y": 293,
+        "width": 522,
+        "height": 420,
+        "photo": 0
+      },
+      {
+        "x": 40,
+        "y": 735,
+        "width": 522,
+        "height": 420,
+        "photo": 1
+      },
+      {
+        "x": 637,
+        "y": 735,
+        "width": 522,
+        "height": 420,
+        "photo": 1
+      },
+      {
+        "x": 40,
+        "y": 1177,
+        "width": 522,
+        "height": 420,
+        "photo": 2
+      },
+      {
+        "x": 637,
+        "y": 1177,
+        "width": 522,
+        "height": 420,
+        "photo": 2
+      }
+    ]
   }
 ]

@@ -306,12 +306,15 @@ export default function GalleryPage() {
 
     loadAllGalleries();
 
+    // Polling setiap 5 detik agar HP / tablet yang membuka galeri otomatis terupdate tanpa refresh
+    const pollTimer = setInterval(loadAllGalleries, 5000);
+
     // Dengarkan event sinkronisasi real-time jika ada pemotretan baru selesai
     let channel: BroadcastChannel | null = null;
     try {
       channel = new BroadcastChannel('photobooth_session_sync');
       channel.onmessage = (event) => {
-        if (event.data?.type === 'SESSION_COMPLETED') {
+        if (event.data?.type === 'SESSION_COMPLETED' || event.data?.type === 'TICKET_SEQUENCE_UPDATED') {
           loadAllGalleries();
         }
       };
@@ -319,6 +322,7 @@ export default function GalleryPage() {
 
     return () => {
       isCancelled = true;
+      clearInterval(pollTimer);
       if (channel) channel.close();
     };
   }, []);

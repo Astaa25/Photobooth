@@ -67,6 +67,8 @@ import {
 import {
   getAndAdvanceTicketNumber,
   getCurrentTicketNumber,
+  setTicketSequence,
+  syncTicketSequenceFromServer,
 } from '@/utils/ticketSequence';
 
 // Tipe Data Kategori Kolom yang Dapat Dikonfigurasi
@@ -185,14 +187,7 @@ const DEFAULT_TEMPLATES: CustomTemplate[] = [
   },
 ];
 
-const INITIAL_QUEUE: QueueItem[] = [
-  { id: '1', number: '#001', nickname: 'Diana', status: 'IN_SESSION', registeredAt: '10:14', printCopies: 2 },
-  { id: '2', number: '#002', nickname: 'Budi & Sari', status: 'QUEUED', registeredAt: '10:18', printCopies: 1 },
-  { id: '3', number: '#003', nickname: 'Kelompok 4 Wisuda', status: 'QUEUED', registeredAt: '10:22', printCopies: 3 },
-  { id: '4', number: '#004', nickname: 'Aris', status: 'WAITING', registeredAt: '10:05', printCopies: 1 },
-  { id: '5', number: '#005', nickname: 'Rani', status: 'DONE', registeredAt: '09:55', printCopies: 2 },
-  { id: '6', number: '#006', nickname: 'Keluarga Dosen TIK', status: 'PRINT_ORDER', registeredAt: '10:30', printCopies: 2 },
-];
+const INITIAL_QUEUE: QueueItem[] = [];
 
 export default function AdminDashboardPage() {
   // Tab Aktif Sidebar
@@ -290,8 +285,11 @@ export default function AdminDashboardPage() {
     fetch('/api/queue')
       .then((res) => res.json())
       .then((res) => {
-        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+        if (res.success && Array.isArray(res.data)) {
           setQueue(res.data);
+          if (typeof res.nextNumber === 'number') {
+            setTicketSequence(res.nextNumber);
+          }
           try {
             localStorage.setItem('photobooth_admin_queue', JSON.stringify(res.data));
           } catch {}
@@ -502,7 +500,7 @@ export default function AdminDashboardPage() {
       fetch('/api/queue')
         .then((res) => res.json())
         .then((res) => {
-          if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          if (res.success && Array.isArray(res.data)) {
             setQueue((prev) => {
               const prevStr = JSON.stringify(prev);
               const newStr = JSON.stringify(res.data);
@@ -699,30 +697,87 @@ export default function AdminDashboardPage() {
     }, 2000);
   };
 
-  // Tambah Antrean Manual dengan nomor tiket urut otomatis
-  const handleAddManualQueue = (e: React.FormEvent) => {
+  // Tambah Antrean Manual dengan nomor tiket urut otomatis dari Database
+  const handleAddManualQueue = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newVisitorNickname.trim()) return;
-    const nextNum = getAndAdvanceTicketNumber();
-    const newItem: QueueItem = {
-      id: `manual-${Date.now()}`,
-      number: nextNum,
-      nickname: newVisitorNickname.trim(),
-      status: 'QUEUED',
-      registeredAt: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
-      printCopies: 1,
-    };
-    persistQueue((prev) => [newItem, ...prev]);
-    fetch('/api/queue', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(newItem),
-    }).catch(() => {});
+    try {
+      const res = await fetch('/api/queue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nickname: newVisitorNickname.trim(),
+          status: 'QUEUED',
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.item) {
+        persistQueue((prev) => [...prev.filter((q) => q.number !== data.item.number), data.item]);
+        if (typeof data.nextNumber === 'number') {
+          setTicketSequence(data.nextNumber);
+        }
+        if (soundEnabled) retroAudio.playSuccessChime();
+        showToast(`Antrean ${data.item.number} (${data.item.nickname}) berhasil ditambahkan!`);
+      }
+    } catch {
+      const nextNum = getAndAdvanceTicketNumber();
+      const newItem: QueueItem = {
+        id: `manual-${Date.now()}`,
+        number: nextNum,
+        nickname: newVisitorNickname.trim(),
+        status: 'QUEUED',
+        registeredAt: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+        printCopies: 1,
+      };
+      persistQueue((prev) => [newItem, ...prev]);
+    }
 
     setNewVisitorNickname('');
     setIsAddingVisitor(false);
-    if (soundEnabled) retroAudio.playSuccessChime();
-    showToast(`Antrean ${nextNum} (${newItem.nickname}) berhasil ditambahkan!`);
+  };
+
+  // Set Ulang Seluruh Antrean dari #001
+  const handleResetQueueSequence = async () => {
+    if (
+      !confirm(
+        '⚠️ ATUR ULANG URUTAN ANTREAN DARI #001?\n\nSemua antrean lama akan dibersihkan dari database server dan nomor tiket baru akan dimulai kembali dari #001.\n\nLanjutkan?'
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/queue?action=reset_sequence', {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (data.success) {
+        setTicketSequence(1);
+        setQueue([]);
+        try {
+          localStorage.setItem('photobooth_admin_queue', '[]');
+          localStorage.removeItem('photobooth_active_session');
+          localStorage.setItem('photobooth_ticket_counter', '1');
+        } catch {}
+
+        // Siarkan sinyal reset ke tablet & tab booth
+        try {
+          const channel = new BroadcastChannel('photobooth_session_sync');
+          channel.postMessage({ type: 'RESET_TO_STANDBY' });
+          channel.postMessage({
+            type: 'TICKET_SEQUENCE_UPDATED',
+            currentTicket: '#001',
+            nextTicket: '#002',
+          });
+          channel.close();
+        } catch {}
+
+        if (soundEnabled) retroAudio.playSuccessChime();
+        showToast('Urutan antrean berhasil diatur ulang dari #001!');
+      }
+    } catch (err: any) {
+      alert('Gagal mengatur ulang antrean: ' + err.message);
+    }
   };
 
   // Hapus Antrean Tiket dari Database & Tampilan
@@ -1073,10 +1128,23 @@ export default function AdminDashboardPage() {
             </h2>
           </div>
 
-          {/* Sisi Kanan Header: Radar Auto-Refresh & Pencarian */}
-          <div className="flex items-center gap-3">
+          {/* Sisi Kanan Header: Tombol Reset Urutan, Radar Auto-Refresh & Pencarian */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Tombol Set Ulang Dari #001 (Request User: Set ulang dari 001 ada di layar admin untuk refresh urutannya) */}
+            {activeTab === 'board' && (
+              <button
+                type="button"
+                onClick={handleResetQueueSequence}
+                className="h-9 px-3 bg-[#FE0168] hover:bg-[#FE0168]/80 text-white font-pixel-title text-[9px] sm:text-[10px] flex items-center gap-1.5 border-2 border-[#FFD84D] shadow-[2px_2px_0_0_#FFD84D] active:scale-95 transition-transform"
+                title="Atur ulang seluruh antrean dan mulai kembali urutan nomor tiket dari #001"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>SET ULANG DARI #001</span>
+              </button>
+            )}
+
             {/* Indikator Denyut Radar Auto-Refresh Berkelanjutan */}
-            <div className="flex items-center gap-2 bg-[#050C38] px-3 py-1.5 border-2 border-[#00E599] text-[10px] font-pixel-title text-[#00E599]">
+            <div className="hidden md:flex items-center gap-2 bg-[#050C38] px-3 py-1.5 border-2 border-[#00E599] text-[10px] font-pixel-title text-[#00E599]">
               <RefreshCw className="w-3 h-3 animate-spin" style={{ animationDuration: '3s' }} />
               <span>AUTO-REFRESH: AKTIF</span>
               <span className="w-2 h-2 bg-[#00E599] rounded-none animate-ping" />
@@ -1084,7 +1152,7 @@ export default function AdminDashboardPage() {
 
             {/* Kotak Pencarian */}
             {activeTab === 'board' && (
-              <div className="relative w-48 sm:w-60">
+              <div className="relative w-40 sm:w-56">
                 <input
                   type="text"
                   value={searchQuery}
@@ -1159,14 +1227,25 @@ export default function AdminDashboardPage() {
                 <div className="bg-[#0C1230]/95 pixel-box p-3 border-2 border-[#5CE1E6] flex flex-col justify-between shadow-[3px_3px_0_0_#050C38]">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-[10px] font-pixel-title text-[#A9B8FF]">TOTAL ANTREAN</span>
-                    <button
-                      type="button"
-                      onClick={() => setIsAddingVisitor(!isAddingVisitor)}
-                      className="px-1.5 py-0.5 bg-[#1E2768] hover:bg-[#5CE1E6] hover:text-[#050C38] text-[#5CE1E6] text-[8px] font-pixel-title flex items-center gap-1 border border-[#5CE1E6]/40"
-                    >
-                      <Plus className="w-2.5 h-2.5" />
-                      <span>TAMBAH</span>
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={handleResetQueueSequence}
+                        className="px-1.5 py-0.5 bg-[#FE0168]/20 hover:bg-[#FE0168] text-[#FE0168] hover:text-white text-[8px] font-pixel-title flex items-center gap-1 border border-[#FE0168]/50"
+                        title="Atur ulang urutan tiket dari #001"
+                      >
+                        <RotateCcw className="w-2 h-2" />
+                        <span>RESET #001</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsAddingVisitor(!isAddingVisitor)}
+                        className="px-1.5 py-0.5 bg-[#1E2768] hover:bg-[#5CE1E6] hover:text-[#050C38] text-[#5CE1E6] text-[8px] font-pixel-title flex items-center gap-1 border border-[#5CE1E6]/40"
+                      >
+                        <Plus className="w-2.5 h-2.5" />
+                        <span>TAMBAH</span>
+                      </button>
+                    </div>
                   </div>
                   <div className="flex items-baseline gap-2">
                     <span className="text-2xl font-pixel-title text-[#5CE1E6] font-bold">
